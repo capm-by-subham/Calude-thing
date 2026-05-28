@@ -104,6 +104,32 @@
       background: rgba(216, 122, 110, 0.18);
       color: #f0c2bb;
     }
+
+    /* Shape stamps: same button look as .tool, but draggable and no "active" state */
+    .shape {
+      width: 46px;
+      height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 11px;
+      background: transparent;
+      color: #c9cdc6;
+      cursor: grab;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .shape:hover {
+      background: rgba(236, 235, 227, 0.08);
+      color: #ecebe3;
+    }
+    .shape:active {
+      cursor: grabbing;
+    }
+    .shape svg {
+      width: 22px;
+      height: 22px;
+    }
   </style>
 </head>
 <body>
@@ -131,6 +157,31 @@
       </svg>
     </button>
 
+    <button class="shape" data-shape="square" draggable="true" title="Drag onto board">
+      <!-- square stamp -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="4" width="16" height="16" rx="1" />
+      </svg>
+    </button>
+
+    <button class="shape" data-shape="circle" draggable="true" title="Drag onto board">
+      <!-- circle stamp -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="8" />
+      </svg>
+    </button>
+
+    <button class="tool" id="undoBtn" title="Undo last step">
+      <!-- undo (curved arrow) icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 14 4 9l5-5" />
+        <path d="M4 9h11a5 5 0 0 1 0 10h-4" />
+      </svg>
+    </button>
+
     <button class="tool" id="clearBtn" title="Clear board">
       <!-- trash icon -->
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -153,11 +204,15 @@
     // Fixed pencil settings (no color picker, no thickness slider)
     const CHALK_COLOR = "#ecebe3";  // warm chalk white
     const PENCIL_SIZE = 3.5;        // pencil thickness
-    const ERASER_SIZE = 30;         // eraser thickness
+    const ERASER_SIZE = 42;         // eraser thickness (square "cube" eraser)
+    const STAMP_SIZE  = 60;         // dropped shape size (px)
+    const STAMP_LINE  = 3;          // dropped shape outline thickness
+    const UNDO_LIMIT  = 20;         // max number of undo snapshots kept
 
     let currentTool = "pencil";     // "pencil" or "eraser"
     let drawing = false;            // is the mouse currently held down?
     let lastX = 0, lastY = 0;       // last known pointer position
+    const historyStack = [];        // snapshots taken before each action
 
     /* ============================================================
        5. CANVAS SIZING (and crisp rendering on high-DPI screens)
@@ -187,6 +242,10 @@
 
       // Paint the old drawing back, stretched to the new size
       ctx.drawImage(snapshot, 0, 0, snapshot.width, snapshot.height, 0, 0, w, h);
+
+      // Old undo snapshots were sized to the previous backing store; drop them
+      // so we never try to putImageData a wrong-sized blob into the new canvas.
+      historyStack.length = 0;
 
       applyBrush(); // re-apply tool settings (they reset on resize)
     }
@@ -222,6 +281,7 @@
        ============================================================ */
     function startDraw(e) {
       drawing = true;
+      pushHistory();        // snapshot BEFORE this stroke, for undo
       applyBrush();
 
       lastX = e.offsetX;
@@ -282,8 +342,13 @@
 
     // Clear Board: wipe everything back to the empty chalkboard
     clearBtn.addEventListener("click", () => {
+      pushHistory();        // so "undo" can restore the board after a clear
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
     });
+
+    // Undo button: restore the snapshot taken before the last action
+    const undoBtn = document.getElementById("undoBtn");
+    undoBtn.addEventListener("click", undo);
 
     /* ============================================================
        9. EVENT WIRING
@@ -296,6 +361,72 @@
     window.addEventListener("pointerup", stopDraw);
 
     window.addEventListener("resize", resizeCanvas);
+
+    /* ============================================================
+       10. SHAPE STAMPS (drag from toolbar, drop on board)
+       The toolbar buttons with class "shape" are HTML5 drag sources.
+       The canvas is a drop target; on drop, we stamp the chosen
+       shape (square or circle) centered on the drop point, in chalk.
+       save()/restore() keeps the user's current brush state intact.
+       ============================================================ */
+    function stampShape(shape, x, y) {
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = CHALK_COLOR;
+      ctx.lineWidth = STAMP_LINE;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      if (shape === "square") {
+        const half = STAMP_SIZE / 2;
+        ctx.strokeRect(x - half, y - half, STAMP_SIZE, STAMP_SIZE);
+      } else if (shape === "circle") {
+        ctx.beginPath();
+        ctx.arc(x, y, STAMP_SIZE / 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    document.querySelectorAll(".shape").forEach((btn) => {
+      btn.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/shape", btn.dataset.shape);
+        e.dataTransfer.effectAllowed = "copy";
+      });
+    });
+
+    canvas.addEventListener("dragover", (e) => {
+      // Must preventDefault here, otherwise "drop" never fires
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    });
+
+    canvas.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const shape = e.dataTransfer.getData("text/shape");
+      if (shape) {
+        pushHistory();    // snapshot BEFORE the stamp, for undo
+        stampShape(shape, e.offsetX, e.offsetY);
+      }
+    });
+
+    /* ============================================================
+       11. UNDO HISTORY
+       Snapshot-based undo: pushHistory() is called BEFORE any change
+       (stroke, stamp, clear). undo() pops the last snapshot and
+       restores it. Snapshots are full-canvas ImageData in device
+       pixels — putImageData ignores the ctx transform, which is
+       exactly what we want here.
+       ============================================================ */
+    function pushHistory() {
+      historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+      if (historyStack.length > UNDO_LIMIT) historyStack.shift();
+    }
+
+    function undo() {
+      const snap = historyStack.pop();
+      if (snap) ctx.putImageData(snap, 0, 0);
+    }
 
     // Kick everything off
     resizeCanvas();
