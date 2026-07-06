@@ -361,11 +361,17 @@ function scheduleDailyReminder(hour = 22, minute = 0) {
 
 scheduleDailyReminder();
 
-// ── Manual test trigger — uncomment to fire ~10s from now instead of
-// waiting for 10 PM IST, useful for checking the notification works.
-// setTimeout(() => {
-//   const f = CONFIG.fields;
-//   sendDailyReminderNotification(
-//     tasks.filter((t) => !t[f.complete] && t[f.priority] === "high")
-//   );
-// }, 10000);
+// ── Manual test trigger — set TEST_HOUR/TEST_MINUTE (24h, IST) to a
+// couple minutes from now and reload the page to fire at that time
+// instead of waiting for 10 PM IST. Set TEST_HOUR to null to disable.
+const TEST_HOUR = 17;
+const TEST_MINUTE = 42;
+
+if (TEST_HOUR !== null) {
+  setTimeout(() => {
+    const f = CONFIG.fields;
+    sendDailyReminderNotification(
+      tasks.filter((t) => !t[f.complete] && t[f.priority] === "high")
+    );
+  }, msUntilNextIST(TEST_HOUR, TEST_MINUTE));
+}
