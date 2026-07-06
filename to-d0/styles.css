@@ -1,16 +1,16 @@
 /* ── Daylist tokens ──────────────────────────────────────────────── */
 :root {
-  --bg: #0b0d14;
-  --card: rgba(255, 255, 255, 0.045);
-  --card-solid: #171a24;
-  --border: rgba(255, 255, 255, 0.09);
-  --ink: #eef1f7;
-  --ink-soft: #8b93a7;
-  --accent: #7c5cff;
-  --accent2: #22d3ee;
-  --accent-grad: linear-gradient(135deg, #7c5cff, #22d3ee);
-  --amber: #f2a33c;
-  --danger: #ff5c7a;
+  --bg: #241a13;
+  --card: rgba(255, 205, 155, 0.045);
+  --card-solid: #2f2219;
+  --border: rgba(255, 205, 155, 0.09);
+  --ink: #f5e9db;
+  --ink-soft: #b19c85;
+  --accent: #ff8a3d;
+  --accent2: #ffc857;
+  --accent-grad: linear-gradient(135deg, #ff8a3d, #ffc857);
+  --amber: #e8993f;
+  --danger: #ff5f52;
   --radius: 18px;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
   --font-display: "Sora", system-ui, sans-serif;
@@ -38,9 +38,9 @@ body {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(900px 500px at 85% -10%, rgba(124, 92, 255, 0.25), transparent 60%),
-    radial-gradient(700px 500px at -10% 20%, rgba(34, 211, 238, 0.16), transparent 60%),
-    radial-gradient(1000px 600px at 50% 120%, rgba(124, 92, 255, 0.12), transparent 60%);
+    radial-gradient(900px 500px at 85% -10%, rgba(255, 138, 61, 0.25), transparent 60%),
+    radial-gradient(700px 500px at -10% 20%, rgba(255, 200, 87, 0.16), transparent 60%),
+    radial-gradient(1000px 600px at 50% 120%, rgba(255, 138, 61, 0.12), transparent 60%);
 }
 
 .app {
@@ -130,7 +130,7 @@ body {
 .composer select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.25);
+  box-shadow: 0 0 0 3px rgba(255, 138, 61, 0.25);
 }
 
 .composer select {
@@ -143,7 +143,7 @@ body {
   text-transform: uppercase;
   color: var(--accent2);
   background-color: var(--card);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2322d3ee' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 8 10 13 15 8'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23ffc857' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 8 10 13 15 8'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   background-size: 12px;
@@ -157,8 +157,8 @@ body {
 
 .composer select.priority-select-high {
   color: var(--danger);
-  border-color: rgba(255, 92, 122, 0.4);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23ff5c7a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 8 10 13 15 8'/%3E%3C/svg%3E");
+  border-color: rgba(255, 95, 82, 0.4);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23ff5f52' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 8 10 13 15 8'/%3E%3C/svg%3E");
 }
 
 .composer select option {
@@ -178,7 +178,7 @@ body {
   border: none;
   border-radius: var(--radius);
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(124, 92, 255, 0.35);
+  box-shadow: 0 6px 20px rgba(255, 138, 61, 0.35);
   transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
 }
 
@@ -212,9 +212,9 @@ body {
   border-radius: var(--radius);
   font-size: 13.5px;
   line-height: 1.45;
-  background: rgba(255, 92, 122, 0.1);
-  border: 1px solid rgba(255, 92, 122, 0.35);
-  color: #ffb3c1;
+  background: rgba(255, 95, 82, 0.1);
+  border: 1px solid rgba(255, 95, 82, 0.35);
+  color: #ffc4ba;
   backdrop-filter: blur(12px);
 }
 .banner::before {
@@ -226,7 +226,7 @@ body {
   height: 18px;
   border-radius: 50%;
   background: var(--danger);
-  color: #1a0a0e;
+  color: #2a0f08;
   font: 800 12px var(--font-display);
 }
 
@@ -258,8 +258,8 @@ body {
 
 /* whole-card highlight for high priority — outline/glow, not a filled background */
 .task.priority-high {
-  border-color: rgba(255, 92, 122, 0.4);
-  box-shadow: var(--shadow), 0 0 0 1px rgba(255, 92, 122, 0.35), 0 0 20px rgba(255, 92, 122, 0.12);
+  border-color: rgba(255, 95, 82, 0.4);
+  box-shadow: var(--shadow), 0 0 0 1px rgba(255, 95, 82, 0.35), 0 0 20px rgba(255, 95, 82, 0.12);
 }
 .task.priority-high.done {
   border-color: var(--border);
@@ -291,7 +291,7 @@ body {
   height: 22px;
   border-radius: 7px;
   border: 2px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 205, 155, 0.03);
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -331,11 +331,11 @@ body {
   padding: 6px 10px;
   font: 500 15px var(--font-body);
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 205, 155, 0.06);
   border: 1px solid var(--accent);
   border-radius: 8px;
 }
-.task-edit-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.25); }
+.task-edit-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(255, 138, 61, 0.25); }
 
 .priority-badge {
   flex: none;
@@ -345,14 +345,14 @@ body {
   text-transform: uppercase;
   border: 1px solid transparent;
   border-radius: 999px;
-  background: rgba(34, 211, 238, 0.14);
+  background: rgba(255, 200, 87, 0.14);
   color: var(--accent2);
   cursor: pointer;
   transition: filter 0.15s, transform 0.1s;
 }
 .priority-badge:active { transform: scale(0.93); }
 .task.priority-high .priority-badge {
-  background: rgba(255, 92, 122, 0.16);
+  background: rgba(255, 95, 82, 0.16);
   color: var(--danger);
 }
 
@@ -373,28 +373,28 @@ body {
 .task-actions button:active { transform: scale(0.95); }
 
 .task-actions .edit-btn {
-  background: rgba(124, 92, 255, 0.14);
-  color: #c3b6ff;
+  background: rgba(255, 138, 61, 0.14);
+  color: #ffd9b0;
 }
 
 .task-actions .del-btn {
-  background: rgba(255, 92, 122, 0.14);
-  color: #ffb3c1;
+  background: rgba(255, 95, 82, 0.14);
+  color: #ffc4ba;
 }
 
 /* hover only for devices that actually have a pointer that can hover —
    keeps mobile taps from getting stuck showing a "hovered" state */
 @media (hover: hover) and (pointer: fine) {
-  .composer select:hover { border-color: rgba(124, 92, 255, 0.35); }
+  .composer select:hover { border-color: rgba(255, 138, 61, 0.35); }
   .composer button:hover { filter: brightness(1.1); }
   .task:hover {
-    border-color: rgba(124, 92, 255, 0.35);
+    border-color: rgba(255, 138, 61, 0.35);
     transform: translateY(-1px);
   }
-  .task.priority-high:hover { border-color: rgba(255, 92, 122, 0.6); }
+  .task.priority-high:hover { border-color: rgba(255, 95, 82, 0.6); }
   .priority-badge:hover { filter: brightness(1.2); }
   .task-actions .edit-btn:hover { background: var(--accent); color: #fff; }
-  .task-actions .del-btn:hover { background: var(--danger); color: #1a0a0e; }
+  .task-actions .del-btn:hover { background: var(--danger); color: #2a0f08; }
 }
 
 /* ── Empty / loading ────────────────────────────────────────────── */
@@ -413,7 +413,7 @@ body {
   color: #fff;
   font-size: 20px;
   font-weight: 700;
-  box-shadow: 0 6px 20px rgba(124, 92, 255, 0.35);
+  box-shadow: 0 6px 20px rgba(255, 138, 61, 0.35);
 }
 .empty p {
   margin: 0;
