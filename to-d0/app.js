@@ -365,7 +365,7 @@ scheduleDailyReminder();
 // couple minutes from now and reload the page to fire at that time
 // instead of waiting for 10 PM IST. Set TEST_HOUR to null to disable.
 const TEST_HOUR = 17;
-const TEST_MINUTE = 42;
+const TEST_MINUTE = 45;
 
 if (TEST_HOUR !== null) {
   setTimeout(() => {
