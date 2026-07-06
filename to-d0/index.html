@@ -10,6 +10,19 @@
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap"
     rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function (OneSignal) {
+      await OneSignal.init({
+        appId: "f057a71a-c30e-4191-a9c1-d8b1ce981cbf",
+        safari_web_id: "web.onesignal.auto.5462a642-4744-4944-be08-d03aa1430cc8",
+        notifyButton: {
+          enable: true,
+        },
+      });
+    });
+  </script>
 </head>
 
 <body>
