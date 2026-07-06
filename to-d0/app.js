@@ -14,6 +14,7 @@ const CONFIG = {
     id: "ID",          // key, Edm.Guid (cuid aspect)
     task: "task",    // String
     complete: "complete", // Boolean
+    priority: "priority", // String enum: high | medium | low
   },
 };
 
@@ -48,21 +49,28 @@ const api = {
     odata("GET", `?$orderby=${CONFIG.fields.complete} asc`).then(
       (d) => d.value
     ),
-  create: (task) =>
+  create: (task, priority) =>
     odata("POST", "", {
       [CONFIG.fields.task]: task,
       [CONFIG.fields.complete]: false,
+      [CONFIG.fields.priority]: priority,
     }),
   setCompleted: (id, complete) =>
     odata("PATCH", keyPath(id), { [CONFIG.fields.complete]: complete }),
   rename: (id, task) =>
     odata("PATCH", keyPath(id), { [CONFIG.fields.task]: task }),
+  setPriority: (id, priority) =>
+    odata("PATCH", keyPath(id), { [CONFIG.fields.priority]: priority }),
   remove: (id) => odata("DELETE", keyPath(id)),
 };
+
+/* high always sorts before low */
+const PRIORITY_RANK = { high: 0, low: 1 };
 
 /* ── 3. DOM references & state ──────────────────────────────────── */
 const els = {
   input: document.getElementById("taskInput"),
+  priorityInput: document.getElementById("priorityInput"),
   addBtn: document.getElementById("addBtn"),
   list: document.getElementById("taskList"),
   empty: document.getElementById("emptyState"),
@@ -73,6 +81,17 @@ const els = {
 
 let tasks = [];
 
+/* incomplete first, then high priority before low, stable otherwise */
+function sortedTasks() {
+  const f = CONFIG.fields;
+  return [...tasks].sort((a, b) => {
+    if (!!a[f.complete] !== !!b[f.complete]) return a[f.complete] ? 1 : -1;
+    const pa = PRIORITY_RANK[a[f.priority]] ?? 1;
+    const pb = PRIORITY_RANK[b[f.priority]] ?? 1;
+    return pa - pb;
+  });
+}
+
 /* ── 4. Rendering ───────────────────────────────────────────────── */
 function render() {
   const f = CONFIG.fields;
@@ -80,9 +99,10 @@ function render() {
   els.empty.hidden = tasks.length !== 0;
   els.counterOpen.textContent = tasks.filter((t) => !t[f.complete]).length;
 
-  for (const task of tasks) {
+  for (const task of sortedTasks()) {
+    const priority = task[f.priority] || "low";
     const li = document.createElement("li");
-    li.className = "task" + (task[f.complete] ? " done" : "");
+    li.className = "task" + (task[f.complete] ? " done" : "") + ` priority-${priority}`;
     li.dataset.id = task[f.id];
 
     const check = document.createElement("input");
@@ -98,6 +118,13 @@ function render() {
     taskEl.className = "task-task";
     taskEl.textContent = task[f.task];
     taskEl.addEventListener("dblclick", () => startEdit(li, task));
+
+    const priorityBadge = document.createElement("button");
+    priorityBadge.type = "button";
+    priorityBadge.className = "priority-badge";
+    priorityBadge.textContent = priority;
+    priorityBadge.title = "Click to toggle priority";
+    priorityBadge.addEventListener("click", () => handlePriorityToggle(task[f.id]));
 
     const actions = document.createElement("div");
     actions.className = "task-actions";
@@ -115,7 +142,7 @@ function render() {
     delBtn.addEventListener("click", () => handleDelete(task[f.id]));
 
     actions.append(editBtn, delBtn);
-    li.append(check, taskEl, actions);
+    li.append(check, taskEl, priorityBadge, actions);
     els.list.appendChild(li);
   }
 }
@@ -143,11 +170,14 @@ async function loadTasks() {
 async function handleAdd() {
   const task = els.input.value.trim();
   if (!task) return;
+  const priority = els.priorityInput.value || "low";
   els.addBtn.disabled = true;
   try {
-    const created = await api.create(task);
+    const created = await api.create(task, priority);
     tasks.push(created);
     els.input.value = "";
+    els.priorityInput.value = "low";
+    updatePriorityFieldStyle();
     render();
     els.input.focus();
   } catch (err) {
@@ -169,6 +199,21 @@ async function handleToggle(id, complete) {
     task[f.complete] = previous; // roll back
     render();
     showError(`Couldn't update the task. ${err.message}`);
+  }
+}
+
+async function handlePriorityToggle(id) {
+  const f = CONFIG.fields;
+  const task = tasks.find((t) => t[f.id] === id);
+  const previous = task[f.priority];
+  task[f.priority] = previous === "high" ? "low" : "high"; // optimistic
+  render();
+  try {
+    await api.setPriority(id, task[f.priority]);
+  } catch (err) {
+    task[f.priority] = previous; // roll back
+    render();
+    showError(`Couldn't update priority. ${err.message}`);
   }
 }
 
@@ -229,6 +274,13 @@ async function handleDelete(id) {
 }
 
 /* ── 6. Wire up ─────────────────────────────────────────────────── */
+function updatePriorityFieldStyle() {
+  els.priorityInput.classList.toggle(
+    "priority-select-high",
+    els.priorityInput.value === "high"
+  );
+}
+
 els.addBtn.disabled = true;
 els.input.addEventListener("input", () => {
   els.addBtn.disabled = !els.input.value.trim();
@@ -237,5 +289,28 @@ els.addBtn.addEventListener("click", handleAdd);
 els.input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") handleAdd();
 });
+els.priorityInput.addEventListener("change", updatePriorityFieldStyle);
+updatePriorityFieldStyle();
 
 loadTasks();
+
+/* ── 7. Daily push notification (stub — wire up later) ─────────── */
+function sendDailyReminderNotification(highPriorityTasks) {
+  // TODO: implement push notification
+}
+
+function scheduleDailyReminder(hour = 22, minute = 0) {
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  setTimeout(() => {
+    const f = CONFIG.fields;
+    const highPriorityTasks = tasks.filter(
+      (t) => !t[f.complete] && t[f.priority] === "high"
+    );
+    sendDailyReminderNotification(highPriorityTasks);
+    scheduleDailyReminder(hour, minute);
+  }, next - now);
+}
+
+scheduleDailyReminder();
