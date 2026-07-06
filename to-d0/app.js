@@ -12,8 +12,8 @@ const CONFIG = {
   // Server-side proxy that sends the push via OneSignal's REST API —
   // see todo/srv/server.js. The browser can't call OneSignal directly
   // (no CORS, and it'd expose the REST API key).
-  notifyUrl:
-    "https://b1d9f557trial-dev-todo-srv.cfapps.us10-001.hana.ondemand.com/notify",
+  // notifyUrl:
+  //   "https://b1d9f557trial-dev-todo-srv.cfapps.us10-001.hana.ondemand.com/notify",
 
   // Field names in your CDS entity — adjust if yours differ.
   fields: {
@@ -303,75 +303,77 @@ loadTasks();
 /* ── 7. Daily push notification (OneSignal — stub, wire up later) ─
    Scheduling is pinned to IST (UTC+5:30) regardless of the browser's
    own timezone: shift "now" by the IST offset and read it back with
-   the UTC getters, so the wall-clock fields are IST's, not local. */
-const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+   the UTC getters, so the wall-clock fields are IST's, not local.
 
-function nowInIST() {
-  return new Date(Date.now() + IST_OFFSET_MS);
-}
-
-function msUntilNextIST(hour, minute) {
-  const nowIST = nowInIST();
-  const target = new Date(Date.UTC(
-    nowIST.getUTCFullYear(),
-    nowIST.getUTCMonth(),
-    nowIST.getUTCDate(),
-    hour,
-    minute,
-    0,
-    0
-  ));
-  let diff = target - nowIST;
-  if (diff <= 0) diff += 24 * 60 * 60 * 1000;
-  return diff;
-}
-
-async function sendDailyReminderNotification(highPriorityTasks) {
-  if (!highPriorityTasks.length) return;
-
-  const count = highPriorityTasks.length;
-  const body =
-    count === 1
-      ? `High priority: "${highPriorityTasks[0][CONFIG.fields.task]}" is still open`
-      : `${count} high-priority tasks are still open`;
-
-  try {
-    const res = await fetch(CONFIG.notifyUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body, heading: "Daylist reminder" }),
-    });
-    const data = await res.json();
-    console.log("Notification sent:", data);
-  } catch (err) {
-    console.error("Couldn't send push notification.", err);
-  }
-}
-
-function scheduleDailyReminder(hour = 22, minute = 0) {
-  setTimeout(() => {
-    const f = CONFIG.fields;
-    const highPriorityTasks = tasks.filter(
-      (t) => !t[f.complete] && t[f.priority] === "high"
-    );
-    sendDailyReminderNotification(highPriorityTasks);
-    scheduleDailyReminder(hour, minute);
-  }, msUntilNextIST(hour, minute));
-}
-
-scheduleDailyReminder();
-
-// ── Manual test trigger — set TEST_HOUR/TEST_MINUTE (24h, IST) to a
-// couple minutes from now and reload the page to fire at that time
-// instead of waiting for 10 PM IST. Set TEST_HOUR to null to disable.
-const TEST_HOUR = 17;
-const TEST_MINUTE = 45;
-
-if (TEST_HOUR !== null) {
-  setTimeout(() => {
-    const f = CONFIG.fields;
-    sendDailyReminderNotification(
-      tasks.filter((t) => !t[f.complete] && t[f.priority] === "high")
-    );
-  }, msUntilNextIST(TEST_HOUR, TEST_MINUTE));
-}
+   Commented out for now — revisit later. */
+// const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+//
+// function nowInIST() {
+//   return new Date(Date.now() + IST_OFFSET_MS);
+// }
+//
+// function msUntilNextIST(hour, minute) {
+//   const nowIST = nowInIST();
+//   const target = new Date(Date.UTC(
+//     nowIST.getUTCFullYear(),
+//     nowIST.getUTCMonth(),
+//     nowIST.getUTCDate(),
+//     hour,
+//     minute,
+//     0,
+//     0
+//   ));
+//   let diff = target - nowIST;
+//   if (diff <= 0) diff += 24 * 60 * 60 * 1000;
+//   return diff;
+// }
+//
+// async function sendDailyReminderNotification(highPriorityTasks) {
+//   if (!highPriorityTasks.length) return;
+//
+//   const count = highPriorityTasks.length;
+//   const body =
+//     count === 1
+//       ? `High priority: "${highPriorityTasks[0][CONFIG.fields.task]}" is still open`
+//       : `${count} high-priority tasks are still open`;
+//
+//   try {
+//     const res = await fetch(CONFIG.notifyUrl, {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify({ body, heading: "Daylist reminder" }),
+//     });
+//     const data = await res.json();
+//     console.log("Notification sent:", data);
+//   } catch (err) {
+//     console.error("Couldn't send push notification.", err);
+//   }
+// }
+//
+// function scheduleDailyReminder(hour = 22, minute = 0) {
+//   setTimeout(() => {
+//     const f = CONFIG.fields;
+//     const highPriorityTasks = tasks.filter(
+//       (t) => !t[f.complete] && t[f.priority] === "high"
+//     );
+//     sendDailyReminderNotification(highPriorityTasks);
+//     scheduleDailyReminder(hour, minute);
+//   }, msUntilNextIST(hour, minute));
+// }
+//
+// scheduleDailyReminder();
+//
+// // ── Manual test trigger — set TEST_HOUR/TEST_MINUTE (24h, IST) to a
+// // couple minutes from now and reload the page to fire at that time
+// // instead of waiting for 10 PM IST. Set TEST_HOUR to null to disable.
+// const TEST_HOUR = 17;
+// const TEST_MINUTE = 45;
+//
+// if (TEST_HOUR !== null) {
+//   setTimeout(() => {
+//     const f = CONFIG.fields;
+//     sendDailyReminderNotification(
+//       tasks.filter((t) => !t[f.complete] && t[f.priority] === "high")
+//     );
+//   }, msUntilNextIST(TEST_HOUR, TEST_MINUTE));
+// }
