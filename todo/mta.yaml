@@ -24,7 +24,6 @@ modules:
         properties:
           srv-url: ${default-url}
     requires:
-      - name: todo-auth
       - name: todo-db
 
   - name: todo-db-deployer
@@ -36,19 +35,6 @@ modules:
       - name: todo-db
 
 resources:
-  - name: todo-auth
-    type: org.cloudfoundry.managed-service
-    parameters:
-      service: xsuaa
-      service-plan: application
-      path: ./xs-security.json
-      config:
-        xsappname: todo-${org}-${space}
-        tenant-mode: dedicated
-        oauth2-configuration:
-          credential-types:
-            - "binding-secret"
-            - "x509"
   - name: todo-db
     type: com.sap.xs.hdi-container
     parameters:

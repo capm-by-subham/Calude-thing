@@ -4,7 +4,8 @@
   "dependencies": {
     "@cap-js/hana": "^2",
     "@sap/cds": "^9",
-    "@sap/xssec": "^4.13.1"
+    "@sap/xssec": "^4.13.1",
+    "cors": "^2.8.6"
   },
   "devDependencies": {
     "@cap-js/sqlite": "^2.4",
@@ -17,7 +18,7 @@
   "cds": {
     "requires": {
       "[production]": {
-        "auth": "xsuaa"
+        "auth": "dummy"
       }
     }
   }
