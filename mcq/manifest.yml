@@ -1,5 +1,0 @@
-applications:
-  - name: mcq
-    memory: 128M
-    buildpacks:
-      - nodejs_buildpack
