@@ -5,571 +5,1322 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Blackboard</title>
   <link rel="icon" type="image/svg+xml" href="blackboard_favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
 
   <style>
     /* ============================================================
-       1. GLOBAL RESET + PAGE LOOK
-       Distraction-free, fullscreen, classic dark chalkboard.
+       0. THEME TOKENS — every color lives here
        ============================================================ */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    :root {
+      --board-1: #233129;
+      --board-2: #1b2620;
+      --board-3: #141d18;
+      --chalk:   #f3f1e7;
+      --ink:     #c9cdc6;
+      --ink-hi:  #ecebe3;
+      --glass:   rgba(18, 27, 22, 0.62);
+      --glass-brd: rgba(236, 235, 227, 0.10);
+      --glow:    rgba(243, 241, 231, 0.35);
+      --danger:  #d87a6e;
+      --wood-1:  #5a4130;
+      --wood-2:  #46311f;
+      --wood-3:  #6a4f33;
+      --ui-font: "Inter", system-ui, sans-serif;
+      --hand-font: "Kalam", "Comic Sans MS", cursive;
     }
 
-    html, body {
-      height: 100%;
-      overflow: hidden;              /* no scrollbars, true fullscreen */
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; }
 
     body {
-      /* Dark slate-green "chalkboard" with a soft vignette for depth */
-      background-color: #1b2620;
-      background-image: radial-gradient(
-        circle at 50% 40%,
-        #233129 0%,
-        #1b2620 55%,
-        #141d18 100%
-      );
+      font-family: var(--ui-font);
+      background-color: var(--board-2);
+      background-image: radial-gradient(circle at 50% 40%,
+        var(--board-1) 0%, var(--board-2) 55%, var(--board-3) 100%);
+      -webkit-user-select: none; user-select: none;
     }
 
     /* ============================================================
-       2. THE DRAWING CANVAS
-       Fills the whole window. The dark background shows through,
-       so the eraser can simply "remove" chalk back to the board.
+       1. BOARD LAYERS: grid → canvas → dust → grain → frame
        ============================================================ */
+    #grid {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(236,235,227,.55) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(236,235,227,.55) 1px, transparent 1px);
+      background-size: 44px 44px;
+      opacity: 0; transition: opacity .35s ease;
+    }
+    body.grid-on #grid { opacity: .09; }
+
     #board {
-      display: block;
-      position: fixed;
-      inset: 0;                      /* top/right/bottom/left = 0 */
-      cursor: crosshair;             /* precise drawing feel */
-      touch-action: none;            /* stops the page from scrolling while drawing */
+      display: block; position: fixed; inset: 0; z-index: 2;
+      cursor: crosshair; touch-action: none;
+    }
+    body[data-tool="pencil"] #board {
+      cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26'><g transform='rotate(38 6 21)'><rect x='3' y='4' width='6.5' height='18' rx='2.4' fill='%23f3f1e7' stroke='%23a9a698' stroke-width='.8'/></g></svg>") 4 22, crosshair;
+    }
+    body[data-tool="eraser"] #board {
+      cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='34' height='24'><rect x='2' y='4' width='30' height='16' rx='4' fill='%23c9b79b' stroke='%237e6a4e' stroke-width='1.4'/><rect x='2' y='4' width='30' height='6.5' rx='3' fill='%23e4d6bd'/></svg>") 17 12, cell;
+    }
+    body[data-tool="text"] #board { cursor: text; }
+
+    #dust {
+      position: fixed; inset: 0; z-index: 3; pointer-events: none;
     }
 
+    /* Fine chalkboard grain — sits over the strokes so chalk looks textured */
+    #grain {
+      position: fixed; inset: 0; z-index: 4; pointer-events: none;
+      opacity: .07; mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>");
+    }
+
+    /* Wood frame + inner vignette for depth */
+    #frame {
+      position: fixed; inset: 0; z-index: 5; pointer-events: none;
+      border: 14px solid var(--wood-2);
+      border-image: repeating-linear-gradient(112deg,
+        var(--wood-1) 0 7px, var(--wood-2) 7px 12px, var(--wood-3) 12px 20px) 14;
+      box-shadow:
+        inset 0 0 90px rgba(0,0,0,.55),
+        inset 0 0 10px rgba(0,0,0,.85);
+    }
+    @media (max-width: 700px) { #frame { border-width: 8px; } }
+
     /* ============================================================
-       3. MINIMAL FLOATING TOOLBAR
-       Just three controls, tucked at the bottom-center.
-       Quiet by default, brightens on hover.
+       2. TOOLBAR — frosted glass, slides up on load, naps when idle
        ============================================================ */
     #toolbar {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
+      position: fixed; bottom: 26px; left: 50%; z-index: 10;
       transform: translateX(-50%);
-      display: flex;
-      gap: 8px;
-      padding: 8px;
-      border-radius: 16px;
-      background: rgba(20, 29, 24, 0.55);
-      border: 1px solid rgba(236, 235, 227, 0.10);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      opacity: 0.55;
-      transition: opacity 0.2s ease;
+      display: flex; align-items: center; gap: 6px;
+      max-width: min(94vw, 780px);
+      padding: 8px 10px; border-radius: 18px;
+      background: var(--glass);
+      border: 1px solid var(--glass-brd);
+      box-shadow: 0 12px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05);
+      backdrop-filter: blur(14px) saturate(1.2);
+      -webkit-backdrop-filter: blur(14px) saturate(1.2);
+      animation: barIn .7s cubic-bezier(.2,.9,.25,1.15) both .15s;
+      transition: transform .4s cubic-bezier(.4,0,.2,1), opacity .4s ease;
     }
-    #toolbar:hover {
-      opacity: 1;
+    @keyframes barIn {
+      from { transform: translateX(-50%) translateY(90px); opacity: 0; }
+      to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
     }
-
-    /* Each tool button */
-    .tool {
-      width: 46px;
-      height: 46px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      border-radius: 11px;
-      background: transparent;
-      color: #c9cdc6;               /* soft chalk grey */
-      cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
+    body.ui-sleep #toolbar,
+    body.zen #toolbar {
+      transform: translateX(-50%) translateY(110px); opacity: 0; pointer-events: none;
     }
-    .tool:hover {
-      background: rgba(236, 235, 227, 0.08);
-      color: #ecebe3;
-    }
-    .tool svg {
-      width: 22px;
-      height: 22px;
+    body.zen.ui-awake #toolbar,
+    body.ui-awake #toolbar {
+      transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto;
     }
 
-    /* The currently selected tool (pencil OR eraser) */
+    .divider {
+      width: 1px; height: 26px; margin: 0 2px; flex: none;
+      background: rgba(236,235,227,.12);
+    }
+
+    .tool, .shape {
+      position: relative;
+      width: 44px; height: 44px; flex: none;
+      display: flex; align-items: center; justify-content: center;
+      border: none; border-radius: 12px;
+      background: transparent; color: var(--ink);
+      cursor: pointer; touch-action: none;
+      transition: background .18s ease, color .18s ease,
+                  transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .25s ease;
+    }
+    .tool:hover, .shape:hover {
+      background: rgba(236,235,227,.08); color: var(--ink-hi);
+      transform: translateY(-2px);
+    }
+    .tool:active, .shape:active { transform: translateY(0) scale(.94); }
+    .tool svg, .shape svg { width: 21px; height: 21px; }
+
     .tool.active {
-      background: rgba(236, 235, 227, 0.16);
-      color: #ecebe3;
+      background: rgba(236,235,227,.16); color: var(--ink-hi);
+      transform: translateY(-2px) scale(1.06);
+      box-shadow: 0 0 0 1px rgba(236,235,227,.22), 0 0 18px var(--glow);
+      animation: toolPulse 2.4s ease-in-out infinite;
+    }
+    @keyframes toolPulse {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(236,235,227,.22), 0 0 14px var(--glow); }
+      50%      { box-shadow: 0 0 0 1px rgba(236,235,227,.30), 0 0 26px var(--glow); }
     }
 
-    /* The "Clear" button gets a subtle warm tint on hover */
-    #clearBtn:hover {
-      background: rgba(216, 122, 110, 0.18);
-      color: #f0c2bb;
+    #clearBtn:hover { background: rgba(216,122,110,.18); color: #f0c2bb; }
+    .shape { cursor: grab; }
+    .shape:active { cursor: grabbing; }
+
+    /* Current-color dot inside the palette button */
+    #colorBtn .dot {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--chalk);
+      box-shadow: 0 0 8px var(--glow), inset 0 -2px 3px rgba(0,0,0,.25);
+      transition: background .25s ease;
     }
 
-    /* Shape stamps: same button look as .tool, but draggable and no "active" state */
-    .shape {
-      width: 46px;
-      height: 46px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      border-radius: 11px;
-      background: transparent;
-      color: #c9cdc6;
-      cursor: grab;
-      transition: background 0.15s ease, color 0.15s ease;
+    /* Tooltips */
+    [data-tip]::after {
+      content: attr(data-tip);
+      position: absolute; bottom: calc(100% + 12px); left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      padding: 5px 10px; border-radius: 8px; white-space: nowrap;
+      font: 500 11.5px/1 var(--ui-font); letter-spacing: .2px;
+      color: var(--ink-hi); background: rgba(10,16,13,.92);
+      border: 1px solid var(--glass-brd);
+      opacity: 0; pointer-events: none;
+      transition: opacity .18s ease .25s, transform .18s ease .25s;
     }
-    .shape:hover {
-      background: rgba(236, 235, 227, 0.08);
-      color: #ecebe3;
+    [data-tip]:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ============================================================
+       3. POPOVERS (palette / thickness / stamp tray)
+       ============================================================ */
+    .popover {
+      position: absolute; bottom: calc(100% + 12px);
+      display: flex; gap: 8px; align-items: center;
+      padding: 10px; border-radius: 14px;
+      background: var(--glass); border: 1px solid var(--glass-brd);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.45);
+      transform-origin: bottom center;
+      transform: translateX(-50%) scale(.85) translateY(8px);
+      opacity: 0; pointer-events: none;
+      transition: transform .22s cubic-bezier(.34,1.56,.64,1), opacity .18s ease;
     }
-    .shape:active {
-      cursor: grabbing;
+    .popover.open {
+      opacity: 1; pointer-events: auto;
+      transform: translateX(-50%) scale(1) translateY(0);
     }
-    .shape svg {
-      width: 22px;
-      height: 22px;
+
+    .swatch {
+      width: 26px; height: 26px; border-radius: 50%;
+      border: 2px solid transparent; cursor: pointer; flex: none;
+      box-shadow: inset 0 -3px 4px rgba(0,0,0,.25);
+      transition: transform .18s cubic-bezier(.34,1.56,.64,1), border-color .18s, box-shadow .18s;
+    }
+    .swatch:hover { transform: scale(1.18); }
+    .swatch.active {
+      border-color: var(--ink-hi); transform: scale(1.18);
+      box-shadow: 0 0 12px currentColor, inset 0 -3px 4px rgba(0,0,0,.25);
+    }
+
+    .size-opt {
+      width: 40px; height: 40px; border-radius: 10px; border: none;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent; color: var(--ink); cursor: pointer;
+      transition: background .15s, transform .18s cubic-bezier(.34,1.56,.64,1);
+    }
+    .size-opt:hover { background: rgba(236,235,227,.08); transform: scale(1.08); }
+    .size-opt.active { background: rgba(236,235,227,.16); color: var(--ink-hi); }
+    .size-opt i { border-radius: 50%; background: currentColor; display: block; }
+    .size-opt[data-size="thin"]   i { width: 4px;  height: 4px; }
+    .size-opt[data-size="medium"] i { width: 8px;  height: 8px; }
+    .size-opt[data-size="thick"]  i { width: 13px; height: 13px; }
+
+    /* ============================================================
+       4. PAGINATION (top center)
+       ============================================================ */
+    #pages {
+      position: fixed; top: 26px; left: 50%; z-index: 10;
+      transform: translateX(-50%);
+      display: flex; gap: 6px; padding: 6px;
+      border-radius: 14px; background: var(--glass);
+      border: 1px solid var(--glass-brd);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      animation: pagesIn .7s cubic-bezier(.2,.9,.25,1.15) both .3s;
+      transition: transform .4s cubic-bezier(.4,0,.2,1), opacity .4s ease;
+    }
+    @keyframes pagesIn {
+      from { transform: translateX(-50%) translateY(-70px); opacity: 0; }
+      to   { transform: translateX(-50%) translateY(0);     opacity: 1; }
+    }
+    body.zen #pages, body.ui-sleep #pages {
+      transform: translateX(-50%) translateY(-80px); opacity: 0; pointer-events: none;
+    }
+    body.ui-awake #pages, body.zen.ui-awake #pages {
+      transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto;
+    }
+    .page-dot, #addPage {
+      min-width: 30px; height: 30px; padding: 0 6px;
+      border: none; border-radius: 9px; cursor: pointer;
+      background: transparent; color: var(--ink);
+      font: 600 12.5px var(--ui-font);
+      transition: background .15s, color .15s, transform .2s cubic-bezier(.34,1.56,.64,1);
+    }
+    .page-dot:hover, #addPage:hover { background: rgba(236,235,227,.08); color: var(--ink-hi); transform: translateY(-1px); }
+    .page-dot.active {
+      background: rgba(236,235,227,.16); color: var(--ink-hi);
+      box-shadow: 0 0 12px var(--glow);
+    }
+
+    /* ============================================================
+       5. FEEDBACK LAYERS: flash, wiper, saved pill, drag ghost, hint
+       ============================================================ */
+    #flash {
+      position: fixed; inset: 0; z-index: 12; pointer-events: none;
+      background: radial-gradient(circle at 50% 50%, rgba(243,241,231,.28), transparent 65%);
+      opacity: 0;
+    }
+    #flash.go { animation: rewind .38s ease-out; }
+    @keyframes rewind { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+
+    #wiper {
+      position: fixed; top: 0; z-index: 6; pointer-events: none; display: none;
+      width: 74px; height: 100vh; left: -80px;
+      background: linear-gradient(90deg, transparent, rgba(243,241,231,.06) 55%, rgba(243,241,231,.12));
+    }
+    #wiper::after {
+      content: ""; position: absolute; right: -18px; top: 50%;
+      width: 36px; height: 120px; transform: translateY(-50%) rotate(4deg);
+      border-radius: 8px; background: linear-gradient(180deg, #e4d6bd 18%, #c9b79b 18%);
+      border: 1.5px solid #7e6a4e; box-shadow: 0 8px 22px rgba(0,0,0,.4);
+    }
+
+    #saved {
+      position: fixed; top: 30px; right: 34px; z-index: 11;
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 999px;
+      background: var(--glass); border: 1px solid var(--glass-brd);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      color: #a7e8b0; font: 500 12px var(--ui-font);
+      opacity: 0; transform: translateY(-6px); pointer-events: none;
+      transition: opacity .3s ease, transform .3s ease;
+    }
+    #saved.show { opacity: 1; transform: translateY(0); }
+
+    #dragGhost {
+      position: fixed; z-index: 30; pointer-events: none; display: none;
+      color: var(--chalk); filter: drop-shadow(0 6px 14px rgba(0,0,0,.5));
+      transform: translate(-50%, -50%) rotate(-8deg) scale(1.5);
+      transition: transform .12s ease;
+    }
+    #dragGhost svg { width: 34px; height: 34px; display: block; }
+
+    #hint {
+      position: fixed; bottom: 96px; left: 50%; z-index: 9;
+      transform: translateX(-50%);
+      padding: 9px 16px; border-radius: 12px;
+      background: var(--glass); border: 1px solid var(--glass-brd);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      color: var(--ink-hi); font: 500 13px var(--ui-font);
+      animation: hintFloat 2.2s ease-in-out infinite;
+      transition: opacity .5s ease; white-space: nowrap;
+    }
+    #hint::after {
+      content: ""; position: absolute; left: 50%; bottom: -6px;
+      width: 12px; height: 12px; transform: translateX(-50%) rotate(45deg);
+      background: inherit; border-right: 1px solid var(--glass-brd);
+      border-bottom: 1px solid var(--glass-brd);
+    }
+    @keyframes hintFloat {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50%      { transform: translateX(-50%) translateY(-7px); }
+    }
+    #hint.gone { opacity: 0; pointer-events: none; }
+
+    /* Save button success bounce */
+    @keyframes dlPop {
+      0% { transform: translateY(-2px) scale(1); }
+      35% { transform: translateY(4px) scale(.88); }
+      70% { transform: translateY(-5px) scale(1.12); }
+      100% { transform: translateY(-2px) scale(1); }
+    }
+    .tool.dl-pop { animation: dlPop .5s cubic-bezier(.34,1.56,.64,1); color: #a7e8b0; }
+
+    /* ============================================================
+       6. HELP MODAL
+       ============================================================ */
+    #modalWrap {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(8, 13, 10, .55);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      opacity: 0; pointer-events: none; transition: opacity .25s ease;
+    }
+    #modalWrap.open { opacity: 1; pointer-events: auto; }
+    #modal {
+      width: min(92vw, 420px); padding: 26px 28px;
+      border-radius: 20px; background: rgba(24, 34, 28, .92);
+      border: 1px solid var(--glass-brd);
+      box-shadow: 0 30px 80px rgba(0,0,0,.6);
+      transform: scale(.86) translateY(16px);
+      transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+    }
+    #modalWrap.open #modal { transform: scale(1) translateY(0); }
+    #modal h2 {
+      font: 700 22px var(--hand-font); color: var(--ink-hi);
+      margin-bottom: 16px; letter-spacing: .5px;
+    }
+    .sc-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 0; color: var(--ink); font: 400 13.5px var(--ui-font);
+      border-bottom: 1px dashed rgba(236,235,227,.08);
+    }
+    .sc-row:last-child { border-bottom: none; }
+    kbd {
+      display: inline-block; min-width: 24px; text-align: center;
+      padding: 3px 7px; margin-left: 4px; border-radius: 6px;
+      background: rgba(236,235,227,.1); border: 1px solid rgba(236,235,227,.16);
+      box-shadow: 0 2px 0 rgba(0,0,0,.35);
+      font: 600 11px var(--ui-font); color: var(--ink-hi);
+    }
+    #modalClose {
+      margin-top: 18px; width: 100%; padding: 9px 0;
+      border: 1px solid var(--glass-brd); border-radius: 10px;
+      background: rgba(236,235,227,.08); color: var(--ink-hi);
+      font: 600 13px var(--ui-font); cursor: pointer;
+      transition: background .15s;
+    }
+    #modalClose:hover { background: rgba(236,235,227,.15); }
+
+    @media (max-width: 640px) {
+      #toolbar { gap: 3px; padding: 6px; overflow-x: auto; }
+      .tool, .shape { width: 40px; height: 40px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
     }
   </style>
 </head>
-<body>
+<body data-tool="pencil">
 
-  <!-- The full-screen drawing surface -->
+  <!-- Board layers -->
+  <div id="grid"></div>
   <canvas id="board"></canvas>
+  <canvas id="dust"></canvas>
+  <div id="grain"></div>
+  <div id="frame"></div>
+  <div id="wiper"></div>
+  <div id="flash"></div>
 
-  <!-- The only UI: pencil, eraser, clear -->
+  <!-- Page switcher -->
+  <div id="pages"></div>
+
+  <!-- Saved indicator -->
+  <div id="saved">Saved ✓</div>
+
+  <!-- Stamp drag ghost -->
+  <div id="dragGhost"></div>
+
+  <!-- Toolbar -->
   <div id="toolbar">
-    <button class="tool active" id="pencilBtn" title="Pencil">
-      <!-- pencil icon -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-           stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 20h9" />
-        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    <button class="tool active" id="pencilBtn" data-tip="Pencil · P">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
       </svg>
     </button>
 
-    <button class="tool" id="eraserBtn" title="Eraser">
-      <!-- eraser icon -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-           stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 16 13 6a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L13 18H7Z" />
-        <path d="M22 20H7" />
+    <button class="tool" id="eraserBtn" data-tip="Eraser · E">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 16 13 6a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L13 18H7Z"/><path d="M22 20H7"/>
       </svg>
     </button>
 
-    <button class="tool" id="textBtn" title="Text (click to place caret, then type)">
-      <!-- text icon -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-           stroke-linecap="round" stroke-linejoin="round">
-        <path d="M5 6V4h14v2" />
-        <path d="M12 4v16" />
-        <path d="M9 20h6" />
+    <button class="tool" id="textBtn" data-tip="Text · T">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/>
       </svg>
     </button>
 
-    <button class="shape" data-shape="square" draggable="true" title="Drag onto board">
-      <!-- square stamp -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-           stroke-linecap="round" stroke-linejoin="round">
-        <rect x="4" y="4" width="16" height="16" rx="1" />
+    <button class="tool" id="stampsBtn" data-tip="Shape stamps">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="8" height="8" rx="1"/><circle cx="17" cy="7" r="4"/>
+        <path d="M7 13l4 8H3Z"/><path d="M14 21l3-4 3 4"/>
       </svg>
     </button>
 
-    <button class="shape" data-shape="circle" draggable="true" title="Drag onto board">
-      <!-- circle stamp -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-           stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="8" />
+    <div class="divider"></div>
+
+    <button class="tool" id="colorBtn" data-tip="Chalk color">
+      <span class="dot"></span>
+    </button>
+
+    <button class="tool" id="sizeBtn" data-tip="Thickness">
+      <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="2.8"/><circle cx="19" cy="12" r="4"/>
       </svg>
     </button>
 
-    <button class="tool" id="undoBtn" title="Undo last step">
-      <!-- undo (curved arrow) icon -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-           stroke-linecap="round" stroke-linejoin="round">
-        <path d="M9 14 4 9l5-5" />
-        <path d="M4 9h11a5 5 0 0 1 0 10h-4" />
+    <div class="divider"></div>
+
+    <button class="tool" id="gridBtn" data-tip="Grid · G">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
       </svg>
     </button>
 
-    <button class="tool" id="clearBtn" title="Clear board">
-      <!-- trash icon -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-           stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 6h18" />
-        <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
-        <path d="M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6" />
-        <path d="M10 11v6M14 11v6" />
+    <button class="tool" id="soundBtn" data-tip="Chalk sound: off">
+      <svg id="soundOnIcon" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>
+      </svg>
+      <svg id="soundOffIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 5 6 9H2v6h4l5 4z"/><path d="m16 9 5 5M21 9l-5 5"/>
       </svg>
     </button>
+
+    <div class="divider"></div>
+
+    <button class="tool" id="undoBtn" data-tip="Undo · Ctrl+Z">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>
+      </svg>
+    </button>
+
+    <button class="tool" id="clearBtn" data-tip="Clear board · C">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/>
+        <path d="M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/><path d="M10 11v6M14 11v6"/>
+      </svg>
+    </button>
+
+    <div class="divider"></div>
+
+    <button class="tool" id="saveBtn" data-tip="Save PNG · Ctrl+S">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>
+      </svg>
+    </button>
+
+    <button class="tool" id="zenBtn" data-tip="Zen mode · F">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/>
+        <path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+      </svg>
+    </button>
+
+    <button class="tool" id="helpBtn" data-tip="Shortcuts · ?">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/><path d="M9.3 9a2.8 2.8 0 0 1 5.4 1c0 1.8-2.7 2.2-2.7 3.6"/><path d="M12 17h.01"/>
+      </svg>
+    </button>
+
+    <!-- Popover: chalk palette -->
+    <div class="popover" id="colorPop">
+      <button class="swatch active" data-color="#f3f1e7" style="background:#f3f1e7;color:#f3f1e7" data-tip="White"></button>
+      <button class="swatch" data-color="#ffe08a" style="background:#ffe08a;color:#ffe08a" data-tip="Yellow"></button>
+      <button class="swatch" data-color="#ff9db1" style="background:#ff9db1;color:#ff9db1" data-tip="Pink"></button>
+      <button class="swatch" data-color="#8ec5ff" style="background:#8ec5ff;color:#8ec5ff" data-tip="Blue"></button>
+      <button class="swatch" data-color="#a7e8b0" style="background:#a7e8b0;color:#a7e8b0" data-tip="Green"></button>
+      <button class="swatch" data-color="#ffb36b" style="background:#ffb36b;color:#ffb36b" data-tip="Orange"></button>
+    </div>
+
+    <!-- Popover: thickness -->
+    <div class="popover" id="sizePop">
+      <button class="size-opt" data-size="thin" data-tip="Thin"><i></i></button>
+      <button class="size-opt active" data-size="medium" data-tip="Medium"><i></i></button>
+      <button class="size-opt" data-size="thick" data-tip="Thick"><i></i></button>
+    </div>
+
+    <!-- Popover: stamp tray (drag a shape onto the board) -->
+    <div class="popover" id="stampPop">
+      <button class="shape" data-shape="square" data-tip="Drag me">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="1"/></svg>
+      </button>
+      <button class="shape" data-shape="circle" data-tip="Drag me">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/></svg>
+      </button>
+      <button class="shape" data-shape="triangle" data-tip="Drag me">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 4l8 15H4Z"/></svg>
+      </button>
+      <button class="shape" data-shape="arrow" data-tip="Drag me">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15"/><path d="m13 6 6 6-6 6"/></svg>
+      </button>
+      <button class="shape" data-shape="star" data-tip="Drag me">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3 2.7 5.9 6.3.7-4.7 4.3 1.3 6.1L12 16.9 6.4 20l1.3-6.1L3 9.6l6.3-.7Z"/></svg>
+      </button>
+      <button class="shape" data-shape="heart" data-tip="Drag me">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12.6 12 20l-7.5-7.4a5 5 0 1 1 7.5-6.5 5 5 0 1 1 7.5 6.5Z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- First-visit hint -->
+  <div id="hint">Try me — pick a chalk and draw ✨</div>
+
+  <!-- Shortcuts modal -->
+  <div id="modalWrap">
+    <div id="modal">
+      <h2>Keyboard shortcuts</h2>
+      <div class="sc-row"><span>Pencil</span><span><kbd>P</kbd></span></div>
+      <div class="sc-row"><span>Eraser</span><span><kbd>E</kbd></span></div>
+      <div class="sc-row"><span>Text</span><span><kbd>T</kbd></span></div>
+      <div class="sc-row"><span>Clear board</span><span><kbd>C</kbd></span></div>
+      <div class="sc-row"><span>Toggle grid</span><span><kbd>G</kbd></span></div>
+      <div class="sc-row"><span>Zen mode</span><span><kbd>F</kbd></span></div>
+      <div class="sc-row"><span>Undo</span><span><kbd>Ctrl</kbd><kbd>Z</kbd></span></div>
+      <div class="sc-row"><span>Save PNG</span><span><kbd>Ctrl</kbd><kbd>S</kbd></span></div>
+      <div class="sc-row"><span>This panel</span><span><kbd>?</kbd></span></div>
+      <button id="modalClose">Back to the board</button>
+    </div>
   </div>
 
   <script>
-    /* ============================================================
-       4. SETUP
-       ============================================================ */
-    const canvas = document.getElementById("board");
-    const ctx = canvas.getContext("2d");
+  "use strict";
+  /* ============================================================
+     SETUP & STATE
+     ============================================================ */
+  const canvas = document.getElementById("board");
+  const ctx = canvas.getContext("2d");
+  const dustCanvas = document.getElementById("dust");
+  const dctx = dustCanvas.getContext("2d");
 
-    // Fixed pencil settings (no color picker, no thickness slider)
-    const CHALK_COLOR = "#ecebe3";  // warm chalk white
-    const PENCIL_SIZE = 3.5;        // pencil thickness
-    const ERASER_SIZE = 42;         // eraser thickness (square "cube" eraser)
-    const STAMP_SIZE  = 60;         // dropped shape size (px)
-    const STAMP_LINE  = 3;          // dropped shape outline thickness
-    const UNDO_LIMIT  = 20;         // max number of undo snapshots kept
-    const TEXT_SIZE   = 26;         // text-tool font size (px)
-    const TEXT_FONT   = `${TEXT_SIZE}px sans-serif`;
-    const LINE_HEIGHT = TEXT_SIZE * 1.3;
+  const SIZES = { thin: 2.2, medium: 3.8, thick: 7 };
+  const ERASER_SIZE = 42;
+  const STAMP_SIZE  = 64;
+  const STAMP_LINE  = 3;
+  const UNDO_LIMIT  = 20;
+  const TEXT_SIZE   = 27;
+  const LINE_HEIGHT = TEXT_SIZE * 1.35;
+  const MAX_PAGES   = 8;
+  const STORE_KEY   = "blackboard.v2";
 
-    let currentTool = "pencil";     // "pencil", "eraser", or "text"
-    let drawing = false;            // is the mouse currently held down?
-    let lastX = 0, lastY = 0;       // last known pointer position
-    const historyStack = [];        // snapshots taken before each action
+  const state = {
+    tool: "pencil",          // pencil | eraser | text
+    color: "#f3f1e7",
+    size: SIZES.medium,
+    grid: false,
+    zen: false,
+    sound: false,
+    page: 0,
+    pages: [null],           // dataURL per page (null = blank)
+  };
 
-    // Text-tool state: when the user clicks with the text tool, a caret is
-    // "placed" on the board and subsequent keystrokes are rendered from there.
-    let textActive   = false;       // is a text caret currently placed?
-    let textBaseSnap = null;        // canvas snapshot at the moment the caret was placed
-    let textStartX   = 0;
-    let textStartY   = 0;
-    let textBuffer   = "";          // characters typed since the caret was placed
+  let drawing = false;
+  let busy = false;          // true while wiping / page-sliding
+  let lastX = 0, lastY = 0;
+  const historyStack = [];
 
-    /* ============================================================
-       5. CANVAS SIZING (and crisp rendering on high-DPI screens)
-       The canvas is resized to fill the window. We scale by the
-       device pixel ratio so lines look sharp, then keep drawing in
-       simple CSS pixel coordinates. Existing art is preserved.
-       ============================================================ */
-    function resizeCanvas() {
-      // If the user is mid-typing, bake the text into the canvas first so it
-      // survives the resize (and so textBaseSnap from the old size is dropped).
-      commitText();
+  // Text tool session
+  let textActive = false, textBaseSnap = null, textStartX = 0, textStartY = 0, textBuffer = "";
+  let caretTimer = null, caretOn = true;
 
-      // Take a snapshot of whatever is currently drawn
-      const snapshot = document.createElement("canvas");
-      snapshot.width = canvas.width;
-      snapshot.height = canvas.height;
-      snapshot.getContext("2d").drawImage(canvas, 0, 0);
+  /* ============================================================
+     CANVAS SIZING (high-DPI aware, preserves artwork)
+     ============================================================ */
+  function resizeCanvas() {
+    commitText();
+    const snapshot = document.createElement("canvas");
+    snapshot.width = canvas.width; snapshot.height = canvas.height;
+    if (canvas.width) snapshot.getContext("2d").drawImage(canvas, 0, 0);
 
-      // Resize the real canvas to the window, accounting for screen density
-      const dpr = window.devicePixelRatio || 1;
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const w = window.innerWidth, h = window.innerHeight;
+    canvas.width = w * dpr;  canvas.height = h * dpr;
+    canvas.style.width = w + "px"; canvas.style.height = h + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (snapshot.width) ctx.drawImage(snapshot, 0, 0, snapshot.width, snapshot.height, 0, 0, w, h);
 
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      canvas.style.width = w + "px";
-      canvas.style.height = h + "px";
+    dustCanvas.width = w * dpr; dustCanvas.height = h * dpr;
+    dustCanvas.style.width = w + "px"; dustCanvas.style.height = h + "px";
+    dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      // From now on, 1 unit = 1 CSS pixel (the dpr scaling is automatic)
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    historyStack.length = 0; // old snapshots no longer match the backing store
+  }
 
-      // Paint the old drawing back, stretched to the new size
-      ctx.drawImage(snapshot, 0, 0, snapshot.width, snapshot.height, 0, 0, w, h);
+  /* ============================================================
+     CHALK DUST PARTICLES
+     ============================================================ */
+  const dust = [];
+  let dustRunning = false;
 
-      // Old undo snapshots were sized to the previous backing store; drop them
-      // so we never try to putImageData a wrong-sized blob into the new canvas.
-      historyStack.length = 0;
-
-      applyBrush(); // re-apply tool settings (they reset on resize)
-    }
-
-    /* ============================================================
-       6. BRUSH SETTINGS
-       Configures the context for the active tool.
-       - Pencil:  draws chalk on top of the board.
-       - Eraser:  "destination-out" removes pixels, revealing the
-                  dark board background underneath (true erasing).
-       ============================================================ */
-    function applyBrush() {
-      ctx.lineCap = "round";   // rounded stroke ends = smooth feel
-      ctx.lineJoin = "round";  // rounded corners between segments
-
-      if (currentTool === "pencil") {
-        ctx.globalCompositeOperation = "source-over";
-        ctx.strokeStyle = CHALK_COLOR;
-        ctx.fillStyle = CHALK_COLOR;
-        ctx.lineWidth = PENCIL_SIZE;
-      } else {
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.lineWidth = ERASER_SIZE;
-      }
-    }
-
-    /* ============================================================
-       7. DRAWING LOGIC
-       Smoothing trick: instead of straight lines between raw points
-       (which look jagged on fast strokes), we draw quadratic curves
-       through the midpoints of each pair of points. This is cheap,
-       fast, and makes freehand drawing feel natural.
-       ============================================================ */
-    function startDraw(e) {
-      // Text tool: clicks place a caret rather than starting a stroke.
-      if (currentTool === "text") {
-        placeCaret(e.offsetX, e.offsetY);
-        return;
-      }
-
-      drawing = true;
-      pushHistory();        // snapshot BEFORE this stroke, for undo
-      applyBrush();
-
-      lastX = e.offsetX;
-      lastY = e.offsetY;
-
-      // Draw a small dot so a single click/tap leaves a mark
-      ctx.beginPath();
-      ctx.arc(lastX, lastY, ctx.lineWidth / 2, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Begin the continuous stroke from this point
-      ctx.beginPath();
-      ctx.moveTo(lastX, lastY);
-    }
-
-    function draw(e) {
-      if (!drawing) return;
-
-      const x = e.offsetX;
-      const y = e.offsetY;
-
-      // Midpoint between the last point and the current point
-      const midX = (lastX + x) / 2;
-      const midY = (lastY + y) / 2;
-
-      // Curve smoothly toward the midpoint, using the last point as the bend
-      ctx.quadraticCurveTo(lastX, lastY, midX, midY);
-      ctx.stroke();
-
-      // Continue the path from the midpoint for the next segment
-      ctx.beginPath();
-      ctx.moveTo(midX, midY);
-
-      lastX = x;
-      lastY = y;
-    }
-
-    function stopDraw() {
-      drawing = false;
-    }
-
-    /* ============================================================
-       8. TOOL SWITCHING + CLEAR
-       ============================================================ */
-    const pencilBtn = document.getElementById("pencilBtn");
-    const eraserBtn = document.getElementById("eraserBtn");
-    const textBtn   = document.getElementById("textBtn");
-    const clearBtn  = document.getElementById("clearBtn");
-
-    function selectTool(tool) {
-      // Switching tools ends any in-progress text session (text stays on the board).
-      commitText();
-      currentTool = tool;
-      // Update which button looks "active"
-      pencilBtn.classList.toggle("active", tool === "pencil");
-      eraserBtn.classList.toggle("active", tool === "eraser");
-      textBtn.classList.toggle("active", tool === "text");
-      // Cursor: I-beam for text tool, crosshair for the drawing tools.
-      canvas.style.cursor = tool === "text" ? "text" : "crosshair";
-    }
-
-    pencilBtn.addEventListener("click", () => selectTool("pencil"));
-    eraserBtn.addEventListener("click", () => selectTool("eraser"));
-    textBtn.addEventListener("click", () => selectTool("text"));
-
-    // Clear Board: wipe everything back to the empty chalkboard
-    clearBtn.addEventListener("click", () => {
-      commitText();         // bake any in-progress text in before clearing
-      pushHistory();        // so "undo" can restore the board after a clear
-      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-    });
-
-    // Undo button: restore the snapshot taken before the last action
-    const undoBtn = document.getElementById("undoBtn");
-    undoBtn.addEventListener("click", () => {
-      commitText();
-      undo();
-    });
-
-    /* ============================================================
-       9. EVENT WIRING
-       Pointer events cover mouse (and pen/touch as a bonus) with
-       low latency. Listening on the window for move/up means a
-       stroke won't break if the cursor briefly leaves the canvas.
-       ============================================================ */
-    canvas.addEventListener("pointerdown", startDraw);
-    window.addEventListener("pointermove", draw);
-    window.addEventListener("pointerup", stopDraw);
-
-    window.addEventListener("resize", resizeCanvas);
-
-    /* ============================================================
-       10. SHAPE STAMPS (drag from toolbar, drop on board)
-       The toolbar buttons with class "shape" are HTML5 drag sources.
-       The canvas is a drop target; on drop, we stamp the chosen
-       shape (square or circle) centered on the drop point, in chalk.
-       save()/restore() keeps the user's current brush state intact.
-       ============================================================ */
-    function stampShape(shape, x, y) {
-      ctx.save();
-      ctx.globalCompositeOperation = "source-over";
-      ctx.strokeStyle = CHALK_COLOR;
-      ctx.lineWidth = STAMP_LINE;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-
-      if (shape === "square") {
-        const half = STAMP_SIZE / 2;
-        ctx.strokeRect(x - half, y - half, STAMP_SIZE, STAMP_SIZE);
-      } else if (shape === "circle") {
-        ctx.beginPath();
-        ctx.arc(x, y, STAMP_SIZE / 2, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    document.querySelectorAll(".shape").forEach((btn) => {
-      btn.addEventListener("dragstart", (e) => {
-        e.dataTransfer.setData("text/shape", btn.dataset.shape);
-        e.dataTransfer.effectAllowed = "copy";
+  function spawnDust(x, y, color, n = 2, spread = 6, kick = 0.6) {
+    for (let i = 0; i < n; i++) {
+      dust.push({
+        x: x + (Math.random() - 0.5) * spread,
+        y: y + (Math.random() - 0.5) * spread,
+        vx: (Math.random() - 0.5) * kick,
+        vy: Math.random() * 0.5 + 0.25,
+        r: Math.random() * 1.7 + 0.6,
+        a: Math.random() * 0.5 + 0.3,
+        color,
       });
-    });
-
-    canvas.addEventListener("dragover", (e) => {
-      // Must preventDefault here, otherwise "drop" never fires
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "copy";
-    });
-
-    canvas.addEventListener("drop", (e) => {
-      e.preventDefault();
-      const shape = e.dataTransfer.getData("text/shape");
-      if (shape) {
-        commitText();     // bake any in-progress text into the canvas first
-        pushHistory();    // snapshot BEFORE the stamp, for undo
-        stampShape(shape, e.offsetX, e.offsetY);
-      }
-    });
-
-    /* ============================================================
-       11. UNDO HISTORY
-       Snapshot-based undo: pushHistory() is called BEFORE any change
-       (stroke, stamp, clear). undo() pops the last snapshot and
-       restores it. Snapshots are full-canvas ImageData in device
-       pixels — putImageData ignores the ctx transform, which is
-       exactly what we want here.
-       ============================================================ */
-    function pushHistory() {
-      historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-      if (historyStack.length > UNDO_LIMIT) historyStack.shift();
     }
+    if (!dustRunning) { dustRunning = true; requestAnimationFrame(dustLoop); }
+  }
 
-    function undo() {
-      const snap = historyStack.pop();
-      if (snap) ctx.putImageData(snap, 0, 0);
+  function dustLoop() {
+    dctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    for (let i = dust.length - 1; i >= 0; i--) {
+      const p = dust[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.012; p.a -= 0.012;
+      if (p.a <= 0) { dust.splice(i, 1); continue; }
+      dctx.globalAlpha = p.a;
+      dctx.fillStyle = p.color;
+      dctx.beginPath();
+      dctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      dctx.fill();
     }
+    dctx.globalAlpha = 1;
+    if (dust.length) requestAnimationFrame(dustLoop);
+    else { dustRunning = false; dctx.clearRect(0, 0, window.innerWidth, window.innerHeight); }
+  }
 
-    /* ============================================================
-       12. TEXT INPUT
-       The text tool places a caret on the board; subsequent keystrokes
-       are drawn from that caret. The trick: we snapshot the canvas
-       when the caret is placed, then on each keystroke restore that
-       snapshot and re-render the whole text buffer. This makes
-       Backspace trivial (drop the last char, redraw) and leaves the
-       rest of the board untouched.
-       ============================================================ */
-    function renderText(showCaret) {
-      if (!textBaseSnap) return;
-      // putImageData ignores the dpr transform — exactly what we want for
-      // pixel-perfect restoration of the pre-text canvas state.
-      ctx.putImageData(textBaseSnap, 0, 0);
-
-      ctx.save();
+  /* ============================================================
+     DRAWING — smoothed quadratic strokes with a chalky finish
+     ============================================================ */
+  function applyBrush() {
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    if (state.tool === "eraser") {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = ERASER_SIZE;
+    } else {
       ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = CHALK_COLOR;
-      ctx.font = TEXT_FONT;
-      ctx.textBaseline = "top";
+      ctx.globalAlpha = 0.92;                 // chalk never lays fully solid
+      ctx.strokeStyle = state.color;
+      ctx.fillStyle = state.color;
+      ctx.lineWidth = state.size;
+    }
+  }
 
-      const lines = textBuffer.split("\n");
-      for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i], textStartX, textStartY + i * LINE_HEIGHT);
-      }
+  // Faint speckle around the line = powdery edge
+  function chalkSpeckle(x, y) {
+    const r = state.size * 1.6;
+    for (let i = 0; i < 2; i++) {
+      ctx.globalAlpha = Math.random() * 0.25 + 0.05;
+      ctx.fillRect(x + (Math.random() - 0.5) * r * 2, y + (Math.random() - 0.5) * r * 2, 1, 1);
+    }
+    ctx.globalAlpha = 0.92;
+  }
 
-      if (showCaret) {
-        const lastLine = lines[lines.length - 1];
-        const caretX = textStartX + ctx.measureText(lastLine).width;
-        const caretY = textStartY + (lines.length - 1) * LINE_HEIGHT;
-        ctx.fillRect(caretX, caretY, 2, TEXT_SIZE);
-      }
+  function startDraw(e) {
+    if (busy) return;
+    if (state.tool === "text") { placeCaret(e.clientX, e.clientY); return; }
+
+    drawing = true;
+    pushHistory();
+    applyBrush();
+    // The canvas fills the viewport, so client coords are canvas coords —
+    // and they stay correct even when the pointer passes over the toolbar.
+    lastX = e.clientX; lastY = e.clientY;
+
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, ctx.lineWidth / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+  }
+
+  function draw(e) {
+    if (!drawing) return;
+    const x = e.clientX, y = e.clientY;
+    const midX = (lastX + x) / 2, midY = (lastY + y) / 2;
+
+    ctx.quadraticCurveTo(lastX, lastY, midX, midY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(midX, midY);
+
+    if (state.tool === "pencil") {
+      chalkSpeckle(x, y);
+      if (Math.random() < 0.5) spawnDust(x, y, state.color, 1);
+      const speed = Math.hypot(x - lastX, y - lastY);
+      Sound.scratch(Math.min(0.09, speed * 0.0045));
+    }
+    lastX = x; lastY = y;
+  }
+
+  function stopDraw() {
+    if (!drawing) return;
+    drawing = false;
+    ctx.globalAlpha = 1;
+    Sound.scratch(0);
+    scheduleSave();
+  }
+
+  canvas.addEventListener("pointerdown", startDraw);
+  window.addEventListener("pointermove", draw);
+  window.addEventListener("pointerup", stopDraw);
+  window.addEventListener("pointercancel", stopDraw);
+  window.addEventListener("resize", resizeCanvas);
+
+  /* ============================================================
+     UNDO — snapshot before every action, flash on rewind
+     ============================================================ */
+  function pushHistory() {
+    historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    if (historyStack.length > UNDO_LIMIT) historyStack.shift();
+  }
+
+  function undo() {
+    commitText();
+    const snap = historyStack.pop();
+    if (!snap) return;
+    ctx.putImageData(snap, 0, 0);
+    const flash = document.getElementById("flash");
+    flash.classList.remove("go"); void flash.offsetWidth; flash.classList.add("go");
+    scheduleSave();
+  }
+
+  /* ============================================================
+     CLEAR — an eraser sweeps the board left to right
+     ============================================================ */
+  const wiper = document.getElementById("wiper");
+  function clearBoard() {
+    if (busy) return;
+    commitText();
+    pushHistory();
+    busy = true;
+    wiper.style.display = "block";
+    const w = window.innerWidth, h = window.innerHeight;
+    const dur = 700, t0 = performance.now();
+    const ease = (p) => p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+
+    (function step(now) {
+      const p = ease(Math.min(1, (now - t0) / dur));
+      const x = w * p;
+      ctx.save();
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.globalAlpha = 1;
+      ctx.clearRect(0, 0, x + 2, h);
       ctx.restore();
-    }
-
-    function placeCaret(x, y) {
-      // Clicking again finishes any prior text session before starting a new one.
-      commitText();
-      pushHistory();   // one undo step covers this whole text entry
-      textBaseSnap = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      textStartX = x;
-      textStartY = y;
-      textBuffer = "";
-      textActive = true;
-      renderText(true);
-    }
-
-    function commitText() {
-      if (!textActive) return;
-      // Re-render without the caret indicator so it isn't baked into the canvas.
-      renderText(false);
-      textActive = false;
-      textBaseSnap = null;
-      textBuffer = "";
-    }
-
-    window.addEventListener("keydown", (e) => {
-      if (!textActive) return;
-
-      if (e.key === "Escape") {
-        // Cancel: restore the pre-caret board and pop the unused undo snapshot
-        // so this aborted entry doesn't become an undo step.
-        ctx.putImageData(textBaseSnap, 0, 0);
-        historyStack.pop();
-        textActive = false;
-        textBaseSnap = null;
-        textBuffer = "";
-        e.preventDefault();
-        return;
+      wiper.style.left = (x - 74) + "px";
+      if (Math.random() < 0.7) spawnDust(x, Math.random() * h, "#e8e4d6", 2, 20, 1.2);
+      if (p < 1) requestAnimationFrame(step);
+      else {
+        ctx.clearRect(0, 0, w, h);
+        wiper.style.display = "none";
+        busy = false;
+        scheduleSave();
       }
+    })(t0);
+  }
 
-      if (e.key === "Backspace") {
-        if (textBuffer.length > 0) {
-          textBuffer = textBuffer.slice(0, -1);
-          renderText(true);
+  /* ============================================================
+     SHAPE STAMPS — pointer-based drag (mouse, touch and stylus)
+     ============================================================ */
+  function stampShape(shape, x, y) {
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = state.color;
+    ctx.lineWidth = STAMP_LINE;
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.globalAlpha = 0.92;
+    const s = STAMP_SIZE, h = s / 2;
+    ctx.beginPath();
+    switch (shape) {
+      case "square":   ctx.rect(x - h, y - h, s, s); break;
+      case "circle":   ctx.arc(x, y, h, 0, Math.PI * 2); break;
+      case "triangle":
+        ctx.moveTo(x, y - h); ctx.lineTo(x + h, y + h * 0.85); ctx.lineTo(x - h, y + h * 0.85);
+        ctx.closePath(); break;
+      case "arrow":
+        ctx.moveTo(x - h, y); ctx.lineTo(x + h, y);
+        ctx.moveTo(x + h - 15, y - 12); ctx.lineTo(x + h, y); ctx.lineTo(x + h - 15, y + 12); break;
+      case "star": {
+        const spikes = 5, outer = h, inner = h * 0.44;
+        for (let i = 0; i < spikes * 2; i++) {
+          const r = i % 2 === 0 ? outer : inner;
+          const a = (Math.PI / spikes) * i - Math.PI / 2;
+          const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+          i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
         }
-        e.preventDefault();
-        return;
+        ctx.closePath(); break;
       }
+      case "heart":
+        ctx.moveTo(x, y + h * 0.72);
+        ctx.bezierCurveTo(x - h * 1.15, y + h * 0.02, x - h * 0.6, y - h * 0.9, x, y - h * 0.22);
+        ctx.bezierCurveTo(x + h * 0.6, y - h * 0.9, x + h * 1.15, y + h * 0.02, x, y + h * 0.72);
+        break;
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
 
-      if (e.key === "Enter") {
-        textBuffer += "\n";
-        renderText(true);
-        e.preventDefault();
-        return;
-      }
+  const dragGhost = document.getElementById("dragGhost");
+  let stampDrag = null; // { shape, moved }
 
-      // Only accept printable single-character keys; ignore Ctrl/Cmd/Alt combos
-      // so browser shortcuts still work.
-      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        textBuffer += e.key;
-        renderText(true);
-        e.preventDefault();
+  document.querySelectorAll(".shape").forEach((btn) => {
+    btn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      stampDrag = { shape: btn.dataset.shape, moved: false, sx: e.clientX, sy: e.clientY };
+      dragGhost.innerHTML = btn.querySelector("svg").outerHTML;
+      dragGhost.style.color = state.color;
+      moveGhost(e.clientX, e.clientY);
+      dragGhost.style.display = "block";
+    });
+  });
+
+  function moveGhost(x, y) {
+    dragGhost.style.left = x + "px";
+    dragGhost.style.top = y + "px";
+  }
+
+  window.addEventListener("pointermove", (e) => {
+    if (!stampDrag) return;
+    if (Math.hypot(e.clientX - stampDrag.sx, e.clientY - stampDrag.sy) > 6) stampDrag.moved = true;
+    // Loosen the tilt as it travels, so the drop feels like a snap-in
+    dragGhost.style.transform = `translate(-50%, -50%) rotate(${stampDrag.moved ? -8 : 0}deg) scale(1.5)`;
+    moveGhost(e.clientX, e.clientY);
+  });
+
+  window.addEventListener("pointerup", (e) => {
+    if (!stampDrag) return;
+    const drag = stampDrag; stampDrag = null;
+    dragGhost.style.display = "none";
+    if (!drag.moved || busy) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (el && el.closest("#toolbar, #pages")) return; // dropped back on the UI
+    commitText();
+    pushHistory();
+    stampShape(drag.shape, e.clientX, e.clientY);
+    spawnDust(e.clientX, e.clientY, state.color, 14, STAMP_SIZE, 1.6);
+    Sound.tap();
+    scheduleSave();
+  });
+
+  /* ============================================================
+     TEXT TOOL — chalk handwriting with a blinking caret
+     ============================================================ */
+  function renderText(showCaret) {
+    if (!textBaseSnap) return;
+    ctx.putImageData(textBaseSnap, 0, 0);
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 0.94;
+    ctx.fillStyle = state.color;
+    ctx.font = TEXT_SIZE + "px Kalam, sans-serif";
+    ctx.textBaseline = "top";
+    const lines = textBuffer.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], textStartX, textStartY + i * LINE_HEIGHT);
+    }
+    if (showCaret) {
+      const lastLine = lines[lines.length - 1];
+      const cx = textStartX + ctx.measureText(lastLine).width;
+      const cy = textStartY + (lines.length - 1) * LINE_HEIGHT;
+      ctx.fillRect(cx + 1, cy, 2.5, TEXT_SIZE);
+    }
+    ctx.restore();
+  }
+
+  function placeCaret(x, y) {
+    commitText();
+    pushHistory();
+    textBaseSnap = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    textStartX = x; textStartY = y;
+    textBuffer = ""; textActive = true; caretOn = true;
+    renderText(true);
+    caretTimer = setInterval(() => { caretOn = !caretOn; renderText(caretOn); }, 520);
+  }
+
+  function commitText() {
+    if (!textActive) return;
+    clearInterval(caretTimer);
+    renderText(false);
+    textActive = false; textBaseSnap = null; textBuffer = "";
+    scheduleSave();
+  }
+
+  function cancelText() {
+    clearInterval(caretTimer);
+    ctx.putImageData(textBaseSnap, 0, 0);
+    historyStack.pop();
+    textActive = false; textBaseSnap = null; textBuffer = "";
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if (!textActive) return;
+    if (e.key === "Escape") { cancelText(); e.preventDefault(); return; }
+    if (e.key === "Backspace") {
+      if (textBuffer) { textBuffer = textBuffer.slice(0, -1); caretOn = true; renderText(true); }
+      e.preventDefault(); return;
+    }
+    if (e.key === "Enter") { textBuffer += "\n"; caretOn = true; renderText(true); e.preventDefault(); return; }
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      textBuffer += e.key; caretOn = true; renderText(true); e.preventDefault();
+    }
+  });
+
+  /* ============================================================
+     TOOLBAR: tools, popovers, palette, thickness
+     ============================================================ */
+  const pencilBtn = document.getElementById("pencilBtn");
+  const eraserBtn = document.getElementById("eraserBtn");
+  const textBtn   = document.getElementById("textBtn");
+
+  function selectTool(tool) {
+    commitText();
+    state.tool = tool;
+    document.body.dataset.tool = tool;
+    pencilBtn.classList.toggle("active", tool === "pencil");
+    eraserBtn.classList.toggle("active", tool === "eraser");
+    textBtn.classList.toggle("active", tool === "text");
+  }
+  pencilBtn.addEventListener("click", () => selectTool("pencil"));
+  eraserBtn.addEventListener("click", () => selectTool("eraser"));
+  textBtn.addEventListener("click", () => selectTool("text"));
+
+  // --- Popover plumbing (palette / size / stamps) ---
+  const popovers = {
+    colorPop: document.getElementById("colorPop"),
+    sizePop:  document.getElementById("sizePop"),
+    stampPop: document.getElementById("stampPop"),
+  };
+  const popTriggers = {
+    colorPop: document.getElementById("colorBtn"),
+    sizePop:  document.getElementById("sizeBtn"),
+    stampPop: document.getElementById("stampsBtn"),
+  };
+  let openPop = null;
+
+  function togglePopover(name) {
+    Object.entries(popovers).forEach(([n, el]) => {
+      const open = n === name && openPop !== name;
+      el.classList.toggle("open", open);
+      if (open) {
+        const btn = popTriggers[n];
+        el.style.left = (btn.offsetLeft + btn.offsetWidth / 2) + "px";
       }
     });
+    openPop = openPop === name ? null : name;
+  }
+  Object.entries(popTriggers).forEach(([name, btn]) =>
+    btn.addEventListener("click", () => togglePopover(name)));
 
-    // Kick everything off
-    resizeCanvas();
+  document.addEventListener("pointerdown", (e) => {
+    if (openPop && !e.target.closest(".popover") && !e.target.closest("#colorBtn, #sizeBtn, #stampsBtn")) {
+      togglePopover(openPop);
+    }
+  }, true);
+
+  // --- Palette ---
+  document.querySelectorAll(".swatch").forEach((sw) => {
+    sw.addEventListener("click", () => {
+      document.querySelectorAll(".swatch").forEach((s) => s.classList.remove("active"));
+      sw.classList.add("active");
+      state.color = sw.dataset.color;
+      document.querySelector("#colorBtn .dot").style.background = state.color;
+      if (state.tool === "eraser") selectTool("pencil"); // picking chalk implies drawing
+      if (textActive) renderText(caretOn);               // live-recolor in-progress text
+    });
+  });
+
+  // --- Thickness ---
+  document.querySelectorAll(".size-opt").forEach((opt) => {
+    opt.addEventListener("click", () => {
+      document.querySelectorAll(".size-opt").forEach((o) => o.classList.remove("active"));
+      opt.classList.add("active");
+      state.size = SIZES[opt.dataset.size];
+      if (state.tool !== "pencil") selectTool("pencil");
+    });
+  });
+
+  document.getElementById("undoBtn").addEventListener("click", undo);
+  document.getElementById("clearBtn").addEventListener("click", clearBoard);
+
+  /* ============================================================
+     GRID + ZEN
+     ============================================================ */
+  const gridBtn = document.getElementById("gridBtn");
+  function toggleGrid() {
+    state.grid = !state.grid;
+    document.body.classList.toggle("grid-on", state.grid);
+    gridBtn.classList.toggle("active", state.grid);
+  }
+  gridBtn.addEventListener("click", toggleGrid);
+
+  const zenBtn = document.getElementById("zenBtn");
+  function toggleZen() {
+    state.zen = !state.zen;
+    document.body.classList.toggle("zen", state.zen);
+    zenBtn.classList.toggle("active", state.zen);
+    document.body.classList.remove("ui-awake");
+  }
+  zenBtn.addEventListener("click", toggleZen);
+
+  /* ============================================================
+     UI AUTO-HIDE — toolbar naps after 4s idle, wakes on movement
+     ============================================================ */
+  let idleTimer = null;
+  function wakeUI() {
+    document.body.classList.remove("ui-sleep");
+    if (state.zen) document.body.classList.add("ui-awake");
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (drawing || openPop || modalOpen()) { wakeUI(); return; }
+      document.body.classList.add("ui-sleep");
+      document.body.classList.remove("ui-awake");
+    }, 4000);
+  }
+  window.addEventListener("pointermove", wakeUI);
+  window.addEventListener("pointerdown", wakeUI);
+
+  /* ============================================================
+     PAGES — multiple boards with a slide transition
+     ============================================================ */
+  const pagesEl = document.getElementById("pages");
+
+  function renderPages() {
+    pagesEl.innerHTML = "";
+    state.pages.forEach((_, i) => {
+      const b = document.createElement("button");
+      b.className = "page-dot" + (i === state.page ? " active" : "");
+      b.textContent = i + 1;
+      b.title = "Board " + (i + 1);
+      b.addEventListener("click", () => switchPage(i));
+      pagesEl.appendChild(b);
+    });
+    if (state.pages.length < MAX_PAGES) {
+      const add = document.createElement("button");
+      add.id = "addPage";
+      add.textContent = "+";
+      add.title = "New board";
+      add.addEventListener("click", () => {
+        if (busy) return;
+        state.pages.push(null);
+        switchPage(state.pages.length - 1);
+      });
+      pagesEl.appendChild(add);
+    }
+  }
+
+  function snapshotCurrentPage() {
+    state.pages[state.page] = canvas.toDataURL("image/png");
+  }
+
+  function loadPage(i, done) {
+    historyStack.length = 0;
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    const url = state.pages[i];
+    if (!url) { if (done) done(); return; }
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, window.innerWidth, window.innerHeight);
+      if (done) done();
+    };
+    img.src = url;
+  }
+
+  function switchPage(next) {
+    if (busy || next === state.page) return;
+    busy = true;
+    commitText();
+    snapshotCurrentPage();
+    const dir = next > state.page ? 1 : -1;
+
+    // Ghost of the outgoing board slides away while the new one settles in
+    const ghost = new Image();
+    ghost.src = state.pages[state.page];
+    Object.assign(ghost.style, {
+      position: "fixed", inset: "0", width: "100vw", height: "100vh",
+      zIndex: "3", pointerEvents: "none",
+      transition: "transform .38s cubic-bezier(.4,0,.2,1), opacity .38s ease",
+    });
+    document.body.appendChild(ghost);
+
+    state.page = next;
+    renderPages();
+    loadPage(next, () => {
+      canvas.style.transition = "none";
+      canvas.style.transform = `translateX(${36 * dir}px)`;
+      canvas.style.opacity = "0";
+      requestAnimationFrame(() => {
+        canvas.style.transition = "transform .38s cubic-bezier(.2,.8,.3,1.1), opacity .3s ease";
+        canvas.style.transform = "translateX(0)";
+        canvas.style.opacity = "1";
+        ghost.style.transform = `translateX(${-70 * dir}px)`;
+        ghost.style.opacity = "0";
+      });
+      setTimeout(() => {
+        ghost.remove();
+        canvas.style.transition = canvas.style.transform = canvas.style.opacity = "";
+        busy = false;
+        scheduleSave();
+      }, 420);
+    });
+  }
+
+  /* ============================================================
+     PERSISTENCE — auto-save to localStorage, "Saved ✓" pill
+     ============================================================ */
+  const savedPill = document.getElementById("saved");
+  let saveTimer = null, pillTimer = null;
+
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(persist, 700);
+  }
+
+  function persist() {
+    try {
+      snapshotCurrentPage();
+      localStorage.setItem(STORE_KEY, JSON.stringify({
+        pages: state.pages, page: state.page,
+      }));
+      savedPill.classList.add("show");
+      clearTimeout(pillTimer);
+      pillTimer = setTimeout(() => savedPill.classList.remove("show"), 1400);
+    } catch (err) {
+      /* storage full or unavailable — the board keeps working */
+    }
+  }
+
+  function restore() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (Array.isArray(data.pages) && data.pages.length) {
+        state.pages = data.pages.slice(0, MAX_PAGES);
+        state.page = Math.min(data.page || 0, state.pages.length - 1);
+        loadPage(state.page);
+      }
+    } catch (err) { /* corrupted store — start fresh */ }
+  }
+  window.addEventListener("beforeunload", persist);
+
+  /* ============================================================
+     EXPORT PNG — board + background composited, saved as a file
+     ============================================================ */
+  const saveBtn = document.getElementById("saveBtn");
+  function exportPNG() {
+    commitText();
+    const out = document.createElement("canvas");
+    out.width = canvas.width; out.height = canvas.height;
+    const octx = out.getContext("2d");
+    const g = octx.createRadialGradient(
+      out.width / 2, out.height * 0.4, 0,
+      out.width / 2, out.height * 0.4, Math.max(out.width, out.height) * 0.7);
+    g.addColorStop(0, "#233129"); g.addColorStop(0.55, "#1b2620"); g.addColorStop(1, "#141d18");
+    octx.fillStyle = g;
+    octx.fillRect(0, 0, out.width, out.height);
+    octx.drawImage(canvas, 0, 0);
+
+    const a = document.createElement("a");
+    a.download = "blackboard-" + (state.page + 1) + ".png";
+    a.href = out.toDataURL("image/png");
+    a.click();
+
+    saveBtn.classList.remove("dl-pop"); void saveBtn.offsetWidth;
+    saveBtn.classList.add("dl-pop");
+    Sound.tap();
+  }
+  saveBtn.addEventListener("click", exportPNG);
+
+  /* ============================================================
+     SOUND — generated chalk scratch + stamp tap (muted by default)
+     ============================================================ */
+  const Sound = {
+    ctx: null, scratchGain: null,
+    init() {
+      if (this.ctx) return;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      this.ctx = new AC();
+      // Looping white noise → bandpass ≈ chalk on slate
+      const len = this.ctx.sampleRate * 2;
+      const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const ch = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf; src.loop = true;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = "bandpass"; bp.frequency.value = 2100; bp.Q.value = 0.7;
+      this.scratchGain = this.ctx.createGain();
+      this.scratchGain.gain.value = 0;
+      src.connect(bp).connect(this.scratchGain).connect(this.ctx.destination);
+      src.start();
+    },
+    scratch(v) {
+      if (!state.sound || !this.scratchGain) return;
+      this.scratchGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.035);
+    },
+    tap() {
+      if (!state.sound || !this.ctx) return;
+      const t = this.ctx.currentTime;
+      const len = this.ctx.sampleRate * 0.07;
+      const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const ch = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      const lp = this.ctx.createBiquadFilter();
+      lp.type = "lowpass"; lp.frequency.value = 950;
+      const gn = this.ctx.createGain();
+      gn.gain.setValueAtTime(0.28, t);
+      gn.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+      src.connect(lp).connect(gn).connect(this.ctx.destination);
+      src.start();
+    },
+  };
+
+  const soundBtn = document.getElementById("soundBtn");
+  soundBtn.addEventListener("click", () => {
+    state.sound = !state.sound;
+    if (state.sound) { Sound.init(); if (Sound.ctx) Sound.ctx.resume(); }
+    else Sound.scratch(0);
+    soundBtn.classList.toggle("active", state.sound);
+    soundBtn.dataset.tip = "Chalk sound: " + (state.sound ? "on" : "off");
+    document.getElementById("soundOnIcon").style.display  = state.sound ? "block" : "none";
+    document.getElementById("soundOffIcon").style.display = state.sound ? "none" : "block";
+  });
+
+  /* ============================================================
+     HELP MODAL
+     ============================================================ */
+  const modalWrap = document.getElementById("modalWrap");
+  const modalOpen = () => modalWrap.classList.contains("open");
+  const showModal = (show) => modalWrap.classList.toggle("open", show);
+  document.getElementById("helpBtn").addEventListener("click", () => showModal(true));
+  document.getElementById("modalClose").addEventListener("click", () => showModal(false));
+  modalWrap.addEventListener("click", (e) => { if (e.target === modalWrap) showModal(false); });
+
+  /* ============================================================
+     KEYBOARD SHORTCUTS
+     ============================================================ */
+  window.addEventListener("keydown", (e) => {
+    if (textActive) return;                       // typing on the board
+    if (modalOpen()) {
+      if (e.key === "Escape" || e.key === "?") showModal(false);
+      return;
+    }
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key.toLowerCase() === "z") { undo(); e.preventDefault(); }
+      if (e.key.toLowerCase() === "s") { exportPNG(); e.preventDefault(); }
+      return;
+    }
+    switch (e.key.toLowerCase()) {
+      case "p": selectTool("pencil"); break;
+      case "e": selectTool("eraser"); break;
+      case "t": selectTool("text");   break;
+      case "c": clearBoard();         break;
+      case "g": toggleGrid();         break;
+      case "f": toggleZen();          break;
+      case "?": showModal(true);      break;
+    }
+  });
+
+  /* ============================================================
+     ONBOARDING HINT — first visit only, gone after first touch
+     ============================================================ */
+  const hint = document.getElementById("hint");
+  if (localStorage.getItem("blackboard.seen")) hint.remove();
+  else {
+    const dismiss = () => {
+      hint.classList.add("gone");
+      localStorage.setItem("blackboard.seen", "1");
+      setTimeout(() => hint.remove(), 600);
+      canvas.removeEventListener("pointerdown", dismiss);
+    };
+    canvas.addEventListener("pointerdown", dismiss);
+    setTimeout(dismiss, 12000);
+  }
+
+  /* ============================================================
+     GO
+     ============================================================ */
+  resizeCanvas();
+  restore();
+  renderPages();
+  wakeUI();
   </script>
 </body>
 </html>
