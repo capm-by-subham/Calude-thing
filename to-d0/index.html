@@ -5,11 +5,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Daylist — Personal To-Do</title>
+  <meta name="theme-color" content="#150d07" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap"
     rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+
+  <!-- canvas-confetti for the completion spark burst -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
+
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script>
     window.OneSignalDeferred = window.OneSignalDeferred || [];
@@ -26,7 +31,16 @@
 </head>
 
 <body>
-  <div class="bg-glow" aria-hidden="true"></div>
+  <!-- Animated background: morphing aurora blobs (parallax on mouse)
+       + rising ember particles on canvas -->
+  <div class="bg-stage" aria-hidden="true">
+    <div class="bg-parallax" id="bgParallax">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+    </div>
+    <canvas id="emberCanvas"></canvas>
+  </div>
 
   <main class="app">
     <header class="app-header">
@@ -34,11 +48,26 @@
         <p class="eyebrow">Personal board</p>
         <h1>Daylist</h1>
       </div>
-      <div class="counter" id="counter" aria-live="polite">
-        <span class="counter-num" id="counterOpen">0</span>
-        <span class="counter-label">open</span>
+      <div class="header-side">
+        <button class="sound-toggle" id="soundToggle" type="button" aria-pressed="false"
+          title="Unmute sounds">🔇</button>
+        <div class="counter" id="counter" aria-live="polite">
+          <span class="counter-num" id="counterOpen">0</span>
+          <span class="counter-label">open</span>
+        </div>
       </div>
     </header>
+
+    <!-- Completion progress -->
+    <div class="progress-wrap" aria-label="Completion progress">
+      <div class="progress-meta">
+        <span id="progressCount">No tasks yet</span>
+        <span class="progress-pct" id="progressPct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
 
     <!-- Add task -->
     <div class="composer">

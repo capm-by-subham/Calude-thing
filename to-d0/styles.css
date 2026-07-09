@@ -1,10 +1,17 @@
-/* ── Daylist tokens ──────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════
+   Daylist — "Ember Night" theme
+   Deep roasted dark + coral/gold accents. Signature: rising embers,
+   and a spark burst whenever a task is completed.
+   ════════════════════════════════════════════════════════════════ */
 :root {
-  --bg: #241a13;
-  --card: rgba(255, 205, 155, 0.045);
+  --bg: #150d07;
+  --bg-2: #241a13;
+  --card: rgba(255, 205, 155, 0.055);
+  --card-strong: rgba(255, 205, 155, 0.09);
   --card-solid: #2f2219;
-  --border: rgba(255, 205, 155, 0.09);
-  --ink: #f5e9db;
+  --border: rgba(255, 205, 155, 0.11);
+  --border-glow: rgba(255, 138, 61, 0.35);
+  --ink: #f7ecdd;
   --ink-soft: #b19c85;
   --accent: #ff8a3d;
   --accent2: #ffc857;
@@ -12,14 +19,19 @@
   --amber: #e8993f;
   --danger: #ff5f52;
   --radius: 18px;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --glass-blur: 16px;
   --font-display: "Sora", system-ui, sans-serif;
   --font-body: "Inter", system-ui, sans-serif;
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* playful overshoot */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 * { box-sizing: border-box; }
 
 [hidden] { display: none !important; }
+
+html { scrollbar-gutter: stable; }
 
 body {
   margin: 0;
@@ -30,19 +42,77 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   position: relative;
+  overflow-x: hidden;
 }
 
-.bg-glow {
+/* ── Animated background: aurora blobs + ember canvas ───────────── */
+.bg-stage {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(900px 500px at 85% -10%, rgba(255, 138, 61, 0.25), transparent 60%),
-    radial-gradient(700px 500px at -10% 20%, rgba(255, 200, 87, 0.16), transparent 60%),
-    radial-gradient(1000px 600px at 50% 120%, rgba(255, 138, 61, 0.12), transparent 60%);
+  overflow: hidden;
 }
 
+/* parallax wrapper moved by JS on pointermove */
+.bg-parallax {
+  position: absolute;
+  inset: -6%;
+  will-change: transform;
+  transition: transform 0.6s var(--ease-out);
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.55;
+  mix-blend-mode: screen;
+  animation: blob-drift 26s ease-in-out infinite alternate;
+}
+.blob-1 {
+  width: 55vmax; height: 55vmax;
+  top: -22vmax; right: -14vmax;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 138, 61, 0.5), transparent 65%);
+}
+.blob-2 {
+  width: 44vmax; height: 44vmax;
+  top: 8vmax; left: -18vmax;
+  background: radial-gradient(circle at 60% 40%, rgba(255, 200, 87, 0.34), transparent 65%);
+  animation-duration: 32s;
+  animation-delay: -8s;
+}
+.blob-3 {
+  width: 60vmax; height: 60vmax;
+  bottom: -30vmax; left: 22vmax;
+  background: radial-gradient(circle at 50% 30%, rgba(255, 95, 82, 0.26), transparent 65%);
+  animation-duration: 38s;
+  animation-delay: -16s;
+}
+
+@keyframes blob-drift {
+  0%   { transform: translate(0, 0) scale(1); border-radius: 42% 58% 55% 45% / 55% 42% 58% 45%; }
+  50%  { transform: translate(4vmax, -3vmax) scale(1.12); border-radius: 58% 42% 45% 55% / 45% 58% 42% 55%; }
+  100% { transform: translate(-3vmax, 4vmax) scale(0.94); border-radius: 45% 55% 60% 40% / 52% 46% 54% 48%; }
+}
+
+/* fine grain so the glass has something to frost over */
+.bg-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 220, 180, 0.028) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+
+#emberCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── App shell ───────────────────────────────────────────────────── */
 .app {
   position: relative;
   z-index: 1;
@@ -51,12 +121,29 @@ body {
   padding: 48px 20px 80px;
 }
 
+/* staggered page-load choreography */
+.app > * {
+  opacity: 0;
+  animation: enter 0.7s var(--ease-out) forwards;
+}
+.app > :nth-child(1) { animation-delay: 0.05s; }
+.app > :nth-child(2) { animation-delay: 0.15s; }
+.app > :nth-child(3) { animation-delay: 0.25s; }
+.app > :nth-child(4) { animation-delay: 0.32s; }
+.app > :nth-child(5) { animation-delay: 0.4s; }
+
+@keyframes enter {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
 /* ── Header ─────────────────────────────────────────────────────── */
 .app-header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 28px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .eyebrow {
@@ -71,14 +158,26 @@ body {
 .app-header h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(32px, 6vw, 44px);
+  font-size: clamp(34px, 6vw, 46px);
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1;
-  background: var(--accent-grad);
+  background: linear-gradient(120deg, #ff8a3d 0%, #ffc857 45%, #ff8a3d 90%);
+  background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  animation: shimmer 7s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.header-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .counter {
@@ -89,7 +188,8 @@ body {
   border-radius: 999px;
   background: var(--card);
   border: 1px solid var(--border);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 .counter-num {
@@ -97,11 +197,79 @@ body {
   font-size: 18px;
   font-weight: 700;
   color: var(--accent2);
+  transition: transform 0.2s var(--spring);
 }
+.counter-num.bump { transform: scale(1.35); }
 
 .counter-label {
   font-size: 12px;
   color: var(--ink-soft);
+}
+
+.sound-toggle {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  font-size: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--ink-soft);
+  cursor: pointer;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  transition: color 0.15s, border-color 0.15s, transform 0.1s;
+}
+.sound-toggle:active { transform: scale(0.92); }
+.sound-toggle[aria-pressed="true"] {
+  color: var(--accent2);
+  border-color: var(--border-glow);
+}
+
+/* ── Progress ───────────────────────────────────────────────────── */
+.progress-wrap {
+  margin-bottom: 22px;
+}
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.progress-meta .progress-pct {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--accent2);
+}
+.progress-track {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--card-strong);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  box-shadow: 0 0 12px rgba(255, 138, 61, 0.55);
+  transition: width 0.6s var(--ease-out);
+  position: relative;
+}
+.progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.35) 50%, transparent 80%);
+  background-size: 200% 100%;
+  animation: progress-sheen 2.6s linear infinite;
+}
+@keyframes progress-sheen {
+  from { background-position: 200% 0; }
+  to   { background-position: -100% 0; }
 }
 
 /* ── Composer ───────────────────────────────────────────────────── */
@@ -120,8 +288,9 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(12px);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 
 .composer input::placeholder { color: var(--ink-soft); }
@@ -130,7 +299,7 @@ body {
 .composer select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(255, 138, 61, 0.25);
+  box-shadow: var(--shadow), 0 0 0 3px rgba(255, 138, 61, 0.22), 0 0 24px rgba(255, 138, 61, 0.18);
 }
 
 .composer select {
@@ -150,9 +319,10 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s, color 0.15s, background-image 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, color 0.15s;
 }
 
 .composer select.priority-select-high {
@@ -168,6 +338,8 @@ body {
 }
 
 .composer button {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -179,16 +351,18 @@ body {
   border-radius: var(--radius);
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(255, 138, 61, 0.35);
-  transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
+  transition: filter 0.15s, transform 0.15s var(--spring), box-shadow 0.15s;
 }
 
 .btn-icon {
   font-size: 16px;
   font-weight: 700;
   line-height: 1;
+  transition: transform 0.25s var(--spring);
 }
+.composer button:not(:disabled):active { transform: scale(0.95); }
+.composer button:not(:disabled):active .btn-icon { transform: rotate(90deg); }
 
-.composer button:active { transform: scale(0.97); }
 .composer button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -197,9 +371,24 @@ body {
 }
 .composer button:focus-visible,
 .task-actions button:focus-visible,
-.task-check:focus-visible {
+.priority-badge:focus-visible,
+.sound-toggle:focus-visible,
+.check-wrap input:focus-visible + .check-box {
   outline: 2px solid var(--accent2);
   outline-offset: 2px;
+}
+
+/* ── Ripple (JS injects .ripple spans) ──────────────────────────── */
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  transform: scale(0);
+  animation: ripple 0.55s var(--ease-out) forwards;
+  pointer-events: none;
+}
+@keyframes ripple {
+  to { transform: scale(3.2); opacity: 0; }
 }
 
 /* ── Banner ─────────────────────────────────────────────────────── */
@@ -215,7 +404,12 @@ body {
   background: rgba(255, 95, 82, 0.1);
   border: 1px solid rgba(255, 95, 82, 0.35);
   color: #ffc4ba;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  animation: banner-in 0.3s var(--spring);
+}
+@keyframes banner-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
 }
 .banner::before {
   content: "!";
@@ -250,13 +444,46 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   overflow: hidden;
-  animation: rise 0.25s ease both;
-  transition: border-color 0.2s, transform 0.15s;
+  transition: border-color 0.2s, transform 0.2s var(--ease-out), box-shadow 0.25s, background 0.25s;
+  will-change: transform;
 }
 
-/* whole-card highlight for high priority — outline/glow, not a filled background */
+/* soft inner sheen along the top edge — the "glass" catchlight */
+.task::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 220, 180, 0.28), transparent);
+  pointer-events: none;
+}
+
+/* entrance: spring in (only applied to new / initial items via .task-in) */
+.task-in {
+  animation: task-in 0.45s var(--spring) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+@keyframes task-in {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.96); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* exit: slide + fade + slight rotate (delete) */
+.task-out {
+  animation: task-out 0.32s var(--ease-out) both;
+  pointer-events: none;
+}
+@keyframes task-out {
+  to {
+    opacity: 0;
+    transform: translateX(56px) rotate(2.5deg) scale(0.96);
+  }
+}
+
+/* whole-card highlight for high priority */
 .task.priority-high {
   border-color: rgba(255, 95, 82, 0.4);
   box-shadow: var(--shadow), 0 0 0 1px rgba(255, 95, 82, 0.35), 0 0 20px rgba(255, 95, 82, 0.12);
@@ -274,60 +501,109 @@ body {
   width: 5px;
   background: var(--amber);
   transition: background 0.25s;
+  z-index: 1;
 }
 .task.priority-low::before { background: var(--accent2); }
 .task.priority-high::before { background: var(--danger); }
 .task.done::before { background: var(--accent-grad); }
 
-@keyframes rise {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: none; }
+.task.done {
+  background: rgba(255, 205, 155, 0.03);
 }
 
-.task-check {
+/* completion flash — brief warm glow across the card */
+.task.just-done {
+  animation: done-flash 0.6s var(--ease-out);
+}
+@keyframes done-flash {
+  0%   { background: rgba(255, 170, 90, 0.18); }
+  100% { background: rgba(255, 205, 155, 0.03); }
+}
+
+/* ── Custom animated checkbox ───────────────────────────────────── */
+.check-wrap {
+  position: relative;
   flex: none;
-  appearance: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
-  border: 2px solid var(--border);
-  background: rgba(255, 205, 155, 0.03);
+  width: 24px;
+  height: 24px;
   cursor: pointer;
+}
+.check-wrap input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.check-box {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 205, 155, 0.28);
+  background: rgba(255, 205, 155, 0.04);
   display: grid;
   place-items: center;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.2s, background 0.25s var(--spring), transform 0.2s var(--spring), box-shadow 0.25s;
+  pointer-events: none;
 }
-.task-check::before {
-  content: "";
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  background: var(--accent-grad);
-  transform: scale(0);
-  transition: transform 0.15s;
-}
-.task-check:checked {
+.check-wrap input:checked + .check-box {
   border-color: transparent;
+  background: var(--accent-grad);
+  box-shadow: 0 0 14px rgba(255, 160, 70, 0.55);
+  transform: scale(1.05);
 }
-.task-check:checked::before { transform: scale(1); }
+.check-wrap:active .check-box { transform: scale(0.88); }
 
+.check-box svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: #2a1305;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 22;
+  stroke-dashoffset: 22;
+}
+.check-wrap input:checked + .check-box svg {
+  animation: check-draw 0.32s 0.06s var(--ease-out) forwards;
+}
+@keyframes check-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* ── Task text ──────────────────────────────────────────────────── */
 .task-task {
   flex: 1;
   font-size: 15px;
   line-height: 1.4;
   word-break: break-word;
-  transition: color 0.2s;
+  position: relative;
+  transition: color 0.3s;
 }
 
-.task.done .task-task {
-  color: var(--ink-soft);
-  text-decoration: line-through;
-  text-decoration-color: var(--accent);
-  text-decoration-thickness: 2px;
+/* animated strikethrough: a line that grows across the text */
+.task-task::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 52%;
+  height: 2px;
+  width: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.35s var(--ease-out);
 }
+.task.done .task-task { color: var(--ink-soft); }
+.task.done .task-task::after { transform: scaleX(1); }
 
 .task-edit-input {
   flex: 1;
+  min-width: 0;
   padding: 6px 10px;
   font: 500 15px var(--font-body);
   color: var(--ink);
@@ -348,9 +624,9 @@ body {
   background: rgba(255, 200, 87, 0.14);
   color: var(--accent2);
   cursor: pointer;
-  transition: filter 0.15s, transform 0.1s;
+  transition: filter 0.15s, transform 0.15s var(--spring), background 0.2s, color 0.2s;
 }
-.priority-badge:active { transform: scale(0.93); }
+.priority-badge:active { transform: scale(0.88); }
 .task.priority-high .priority-badge {
   background: rgba(255, 95, 82, 0.16);
   color: var(--danger);
@@ -362,15 +638,17 @@ body {
 }
 
 .task-actions button {
+  position: relative;
+  overflow: hidden;
   padding: 6px 12px;
   font: 600 12px var(--font-body);
   border: 1px solid transparent;
   border-radius: 999px;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, transform 0.1s;
+  transition: color 0.15s, background 0.15s, transform 0.15s var(--spring);
 }
 
-.task-actions button:active { transform: scale(0.95); }
+.task-actions button:active { transform: scale(0.92); }
 
 .task-actions .edit-btn {
   background: rgba(255, 138, 61, 0.14);
@@ -382,38 +660,54 @@ body {
   color: #ffc4ba;
 }
 
-/* hover only for devices that actually have a pointer that can hover —
-   keeps mobile taps from getting stuck showing a "hovered" state */
+/* hover only for devices that can hover */
 @media (hover: hover) and (pointer: fine) {
   .composer select:hover { border-color: rgba(255, 138, 61, 0.35); }
-  .composer button:hover { filter: brightness(1.1); }
-  .task:hover {
-    border-color: rgba(255, 138, 61, 0.35);
+  .composer button:not(:disabled):hover {
+    filter: brightness(1.08);
     transform: translateY(-1px);
+    box-shadow: 0 10px 26px rgba(255, 138, 61, 0.45);
   }
-  .task.priority-high:hover { border-color: rgba(255, 95, 82, 0.6); }
-  .priority-badge:hover { filter: brightness(1.2); }
+  .sound-toggle:hover { color: var(--accent2); border-color: var(--border-glow); }
+  .task:hover {
+    border-color: var(--border-glow);
+    transform: translateY(-2px) scale(1.005);
+    box-shadow: var(--shadow), 0 0 24px rgba(255, 138, 61, 0.14);
+    background: var(--card-strong);
+  }
+  .task.priority-high:hover {
+    border-color: rgba(255, 95, 82, 0.6);
+    box-shadow: var(--shadow), 0 0 0 1px rgba(255, 95, 82, 0.4), 0 0 26px rgba(255, 95, 82, 0.18);
+  }
+  .priority-badge:hover { filter: brightness(1.2); transform: scale(1.06); }
   .task-actions .edit-btn:hover { background: var(--accent); color: #fff; }
   .task-actions .del-btn:hover { background: var(--danger); color: #2a0f08; }
+  .check-wrap:hover .check-box { border-color: var(--accent); }
 }
 
 /* ── Empty / loading ────────────────────────────────────────────── */
 .empty {
   padding: 48px 16px;
   text-align: center;
+  animation: enter 0.5s var(--ease-out);
 }
 .empty-icon {
-  width: 48px;
-  height: 48px;
-  margin: 0 auto 14px;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: var(--accent-grad);
-  color: #fff;
-  font-size: 20px;
-  font-weight: 700;
-  box-shadow: 0 6px 20px rgba(255, 138, 61, 0.35);
+  color: #2a1305;
+  font-size: 22px;
+  font-weight: 800;
+  box-shadow: 0 6px 24px rgba(255, 138, 61, 0.4);
+  animation: float 3.4s ease-in-out infinite;
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
 }
 .empty p {
   margin: 0;
@@ -450,14 +744,10 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Responsive & motion ────────────────────────────────────────── */
-
-/* Mobile: a compact, tap-first "app" layout — cards stack their
-   action row instead of squeezing everything onto one line, and
-   every tappable target grows to a comfortable touch size. */
+/* ── Responsive ─────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .app { padding: 24px 14px 90px; }
-  .app-header { margin-bottom: 20px; }
+  .app-header { margin-bottom: 14px; }
   .task-list { gap: 8px; }
 
   .task {
@@ -465,20 +755,18 @@ body {
     padding: 12px 12px 12px 16px;
     row-gap: 8px;
   }
-  /* checkbox + task text share the top line; actions drop to their
-     own full-width line underneath, right-aligned */
   .task-actions {
     flex: 1 0 100%;
     justify-content: flex-end;
   }
 
-  .task-check { width: 26px; height: 26px; }
+  .check-wrap { width: 27px; height: 27px; }
   .priority-badge { padding: 5px 11px; font-size: 10.5px; }
   .task-actions button { padding: 8px 14px; font-size: 12.5px; }
+
+  .blob { filter: blur(50px); }
 }
 
-/* Small phones: composer controls stack full-width like a native
-   mobile form instead of a cramped desktop toolbar row. */
 @media (max-width: 460px) {
   .app { padding-top: 32px; }
   .composer { flex-direction: column; }
@@ -487,6 +775,14 @@ body {
   .app-header { align-items: center; }
 }
 
+/* ── Reduced motion: calm everything down ───────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .app > * { opacity: 1; }
+  .task-in { opacity: 1; }
+  #emberCanvas { display: none; }
+  .bg-parallax { transform: none !important; }
 }
