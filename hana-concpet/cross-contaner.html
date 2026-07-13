@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cross-Container Access · A Field Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EDE8DE;
+    --paper-2: #E4DECF;
+    --paper-3: #DBD3C1;
+    --ink: #0F1F2E;
+    --ink-2: #2A3944;
+    --ink-3: #556673;
+    --rust: #B04A2C;
+    --rust-dark: #8A3620;
+    --cyan: #367F94;
+    --amber: #C48822;
+    --line: #C4BAA6;
+    --line-2: #A89B82;
+    --code-bg: #16232D;
+    --code-fg: #E8E3D6;
+    --code-comment: #8FA4B0;
+    --code-string: #E4A870;
+    --code-key: #7BB4C7;
+    --code-punct: #B5A588;
+    --ok: #4A8B54;
+    --warn: #C48822;
+    --err: #B04A2C;
+    --radius: 2px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Instrument Sans', -apple-system, system-ui, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      linear-gradient(rgba(196, 186, 166, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(196, 186, 166, 0.08) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-position: -1px -1px;
+  }
+
+  /* ============ layout ============ */
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+
+  .grid-main {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 64px;
+    padding: 64px 0;
+  }
+
+  @media (max-width: 900px) {
+    .grid-main { grid-template-columns: 1fr; gap: 32px; padding: 32px 0; }
+    .container { padding: 0 20px; }
+    aside.toc { position: static; }
+  }
+
+  /* ============ header ============ */
+  header.masthead {
+    border-bottom: 1px solid var(--line-2);
+    padding: 20px 0;
+    background: var(--paper);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    backdrop-filter: blur(6px);
+    background: rgba(237, 232, 222, 0.92);
+  }
+  .masthead-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+  .brand {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--rust);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(176, 74, 44, 0.15);
+  }
+  .stamp {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+    letter-spacing: 0.05em;
+  }
+
+  /* ============ hero ============ */
+  .hero {
+    padding: 96px 0 80px;
+    border-bottom: 1px solid var(--line-2);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .hero-meta .ruled {
+    flex: 1;
+    height: 1px;
+    background: var(--line-2);
+    max-width: 200px;
+  }
+  h1.hero-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(48px, 8vw, 88px);
+    line-height: 0.95;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+    max-width: 900px;
+    margin-bottom: 32px;
+  }
+  h1.hero-title em {
+    font-style: italic;
+    color: var(--rust);
+    font-weight: 500;
+  }
+  .hero-sub {
+    font-size: 20px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 620px;
+    margin-bottom: 48px;
+  }
+  .hero-manifest {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    border-top: 1px solid var(--line-2);
+    padding-top: 32px;
+  }
+  @media (max-width: 700px) { .hero-manifest { grid-template-columns: repeat(2, 1fr); } }
+  .manifest-cell {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .manifest-label {
+    font-size: 10px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+  .manifest-val {
+    font-size: 14px;
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* ============ container diagram ============ */
+  .diagram-wrap {
+    margin: 48px 0 0;
+    padding: 40px 32px;
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    position: relative;
+  }
+  .diagram-wrap::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    border: 1px dashed var(--line-2);
+    pointer-events: none;
+    border-radius: var(--radius);
+  }
+  .diagram-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--ink-3);
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 1;
+  }
+  .diagram-svg-wrap {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: center;
+  }
+  .diagram-svg {
+    width: 100%;
+    max-width: 720px;
+    height: auto;
+  }
+
+  /* ============ TOC ============ */
+  aside.toc {
+    position: sticky;
+    top: 100px;
+    align-self: start;
+    border-right: 1px solid var(--line-2);
+    padding-right: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  aside.toc h4 {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+  aside.toc ol {
+    list-style: none;
+    padding: 0;
+  }
+  aside.toc li {
+    margin-bottom: 10px;
+    display: flex;
+    gap: 10px;
+  }
+  aside.toc li span {
+    color: var(--rust);
+    min-width: 24px;
+    font-weight: 500;
+  }
+  aside.toc a {
+    color: var(--ink-2);
+    text-decoration: none;
+    transition: color 0.15s;
+    line-height: 1.4;
+  }
+  aside.toc a:hover { color: var(--rust); }
+
+  /* ============ sections ============ */
+  main article { max-width: 780px; }
+  section.chapter {
+    margin-bottom: 80px;
+    scroll-margin-top: 100px;
+  }
+  .chapter-head {
+    border-top: 2px solid var(--ink);
+    padding-top: 20px;
+    margin-bottom: 32px;
+  }
+  .chapter-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--rust);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .chapter-code::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+    max-width: 100px;
+  }
+  h2.chapter-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 40px;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 16px;
+  }
+  .chapter-lead {
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    max-width: 620px;
+  }
+
+  /* ============ typography inside chapters ============ */
+  h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin: 40px 0 16px;
+  }
+  h4 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 24px 0 12px;
+    letter-spacing: 0;
+  }
+  p { margin-bottom: 16px; color: var(--ink-2); }
+  strong { color: var(--ink); font-weight: 600; }
+  em { color: var(--rust-dark); font-style: italic; }
+
+  a.inline {
+    color: var(--rust);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  a.inline:hover { color: var(--rust-dark); }
+
+  ul, ol { margin: 12px 0 20px 20px; color: var(--ink-2); }
+  li { margin-bottom: 8px; }
+  ol.numbered { counter-reset: step; list-style: none; margin-left: 0; padding-left: 0; }
+  ol.numbered li {
+    counter-increment: step;
+    padding-left: 44px;
+    position: relative;
+    margin-bottom: 14px;
+  }
+  ol.numbered li::before {
+    content: counter(step, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--rust);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+
+  code.inline-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88em;
+    background: var(--paper-2);
+    padding: 2px 6px;
+    border-radius: var(--radius);
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+
+  /* ============ code blocks ============ */
+  .codeblock {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    border-radius: var(--radius);
+    margin: 20px 0 28px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid #0A1520;
+  }
+  .codeblock-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    background: #0F1B24;
+    border-bottom: 1px solid #223442;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--code-comment);
+    letter-spacing: 0.05em;
+  }
+  .codeblock-filename {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .filename-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--code-string);
+  }
+  .filename-dot.grant { background: #E48B4A; }
+  .filename-dot.synonym { background: #7BB4C7; }
+  .filename-dot.config { background: #C0A868; }
+  .filename-dot.role { background: #B08FCC; }
+  .filename-dot.cds { background: #7FB88C; }
+  .filename-dot.yaml { background: #E4A870; }
+  .copy-btn {
+    background: transparent;
+    border: 1px solid #2A3E4C;
+    color: var(--code-comment);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { color: var(--code-fg); border-color: #4A5E6C; }
+  .copy-btn.copied { color: var(--ok); border-color: var(--ok); }
+  pre.code {
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--code-fg);
+    tab-size: 2;
+  }
+  pre.code .k { color: var(--code-key); }
+  pre.code .s { color: var(--code-string); }
+  pre.code .c { color: var(--code-comment); font-style: italic; }
+  pre.code .p { color: var(--code-punct); }
+  pre.code .cmd { color: #B8D48F; }
+
+  /* ============ callouts ============ */
+  .callout {
+    border-left: 3px solid var(--amber);
+    background: rgba(196, 136, 34, 0.06);
+    padding: 16px 20px;
+    margin: 24px 0;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .callout.warn { border-color: var(--amber); background: rgba(196, 136, 34, 0.08); }
+  .callout.ok { border-color: var(--ok); background: rgba(74, 139, 84, 0.06); }
+  .callout.err { border-color: var(--err); background: rgba(176, 74, 44, 0.06); }
+  .callout-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .callout.ok .callout-label { color: var(--ok); }
+  .callout.err .callout-label { color: var(--err); }
+  .callout p { margin: 0; color: var(--ink); }
+  .callout p + p { margin-top: 8px; }
+
+  /* ============ file manifest cards ============ */
+  .manifest-card {
+    border: 1px solid var(--line-2);
+    background: var(--paper-2);
+    padding: 20px 24px;
+    margin: 20px 0 32px;
+    border-radius: var(--radius);
+    position: relative;
+  }
+  .manifest-card::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    right: -1px;
+    height: 4px;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--ink) 0 8px,
+      transparent 8px 14px
+    );
+  }
+  .manifest-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px dashed var(--line-2);
+  }
+  .manifest-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.005em;
+  }
+  .manifest-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 0;
+    white-space: nowrap;
+    align-self: flex-start;
+  }
+  .manifest-tag.grant { background: var(--rust); }
+  .manifest-tag.synonym { background: var(--cyan); }
+  .manifest-tag.config { background: var(--amber); color: var(--ink); }
+  .manifest-tag.role { background: var(--ink-2); }
+  .manifest-body {
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.55;
+  }
+  .manifest-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 14px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line-2);
+  }
+  .meta-item {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+  .meta-item-label {
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 9px;
+    margin-bottom: 3px;
+  }
+  .meta-item-val { color: var(--ink); }
+
+  /* ============ error table ============ */
+  table.errtable {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 14px;
+  }
+  table.errtable th {
+    text-align: left;
+    padding: 12px 16px;
+    background: var(--paper-2);
+    border-bottom: 2px solid var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  table.errtable td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+    color: var(--ink-2);
+  }
+  table.errtable td.code {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--rust);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  table.errtable tr:last-child td { border-bottom: none; }
+  table.errtable tr:hover td { background: rgba(196, 186, 166, 0.15); }
+
+  /* ============ container comparison ============ */
+  .container-pair {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 20px;
+    align-items: stretch;
+    margin: 32px 0;
+  }
+  @media (max-width: 700px) {
+    .container-pair { grid-template-columns: 1fr; }
+    .bridge-arrow { transform: rotate(90deg); align-self: center; }
+  }
+  .container-box {
+    border: 1px solid var(--ink);
+    padding: 20px;
+    background: var(--paper);
+    position: relative;
+  }
+  .container-box::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    border: 1px solid var(--line);
+    pointer-events: none;
+  }
+  .container-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--rust);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 8px;
+    position: relative;
+    z-index: 1;
+  }
+  .container-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 20px;
+    color: var(--ink);
+    margin-bottom: 4px;
+    position: relative;
+    z-index: 1;
+  }
+  .container-role {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 1;
+  }
+  .container-content {
+    position: relative;
+    z-index: 1;
+    font-size: 13px;
+    color: var(--ink-2);
+    line-height: 1.5;
+  }
+  .container-content ul {
+    margin: 0 0 0 16px;
+    padding: 0;
+  }
+  .container-content li {
+    margin-bottom: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .bridge-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .bridge-arrow svg { width: 40px; height: auto; }
+
+  /* ============ footer ============ */
+  footer {
+    border-top: 1px solid var(--line-2);
+    padding: 40px 0 60px;
+    background: var(--paper-2);
+    margin-top: 80px;
+  }
+  .footer-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 32px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  @media (max-width: 600px) {
+    .footer-inner { flex-direction: column; gap: 12px; text-align: center; }
+  }
+
+  /* ============ flow diagram (deploy chain) ============ */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 28px 0;
+    counter-reset: fstep;
+  }
+  .flow-step {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 20px;
+    padding: 16px 0;
+    border-bottom: 1px dashed var(--line-2);
+    counter-increment: fstep;
+  }
+  .flow-step:last-child { border-bottom: none; }
+  .flow-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--rust);
+    letter-spacing: 0.05em;
+    padding-top: 2px;
+  }
+  .flow-num::before { content: '0' counter(fstep); }
+  .flow-body strong {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 4px;
+    color: var(--ink);
+    font-size: 15px;
+  }
+  .flow-body span {
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.5;
+  }
+
+  ::selection { background: var(--rust); color: var(--paper); }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <span>Field Guide · Cross-Container</span>
+    </div>
+    <div class="stamp">DOC-XC-01 · v1.0</div>
+  </div>
+</header>
+
+<div class="container">
+
+<section class="hero">
+  <div class="hero-meta">
+    <span>Manifest No. 8212-001</span>
+    <span class="ruled"></span>
+    <span>SAP CAP · HANA Cloud · BTP</span>
+  </div>
+  <h1 class="hero-title">Wiring two <em>HDI containers</em> together, without losing your mind.</h1>
+  <p class="hero-sub">
+    A worked reference for granting one HDI container read access to another via <code class="inline-code">.hdbgrants</code>, <code class="inline-code">.hdbsynonym</code>, and <code class="inline-code">.hdbsynonymconfig</code>. Every file below was deployed and verified on BTP Trial.
+  </p>
+  <div class="hero-manifest">
+    <div class="manifest-cell">
+      <div class="manifest-label">Consumer</div>
+      <div class="manifest-val">delivery_management_system</div>
+    </div>
+    <div class="manifest-cell">
+      <div class="manifest-label">Provider</div>
+      <div class="manifest-val">mid_night_crave-db</div>
+    </div>
+    <div class="manifest-cell">
+      <div class="manifest-label">Region</div>
+      <div class="manifest-val">us10 · Trial</div>
+    </div>
+    <div class="manifest-cell">
+      <div class="manifest-label">Status</div>
+      <div class="manifest-val" style="color: var(--ok);">● Verified</div>
+    </div>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="diagram-label">Figure 01 · Access Path</div>
+    <div class="diagram-svg-wrap">
+      <svg class="diagram-svg" viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#0F1F2E"/>
+          </marker>
+          <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="6" stroke="#A89B82" stroke-width="1" opacity="0.4"/>
+          </pattern>
+        </defs>
+
+        <!-- Container A (provider) -->
+        <g transform="translate(30, 40)">
+          <rect x="0" y="0" width="240" height="180" fill="#EDE8DE" stroke="#0F1F2E" stroke-width="1.5"/>
+          <rect x="6" y="6" width="228" height="168" fill="none" stroke="#A89B82" stroke-width="1" stroke-dasharray="3 3"/>
+          <text x="120" y="30" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#B04A2C" letter-spacing="1.5">PROVIDER</text>
+          <text x="120" y="58" text-anchor="middle" font-family="'Space Grotesk', sans-serif" font-size="16" font-weight="600" fill="#0F1F2E">Container A</text>
+          <text x="120" y="76" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#556673">mid_night_crave-db</text>
+
+          <line x1="24" y1="94" x2="216" y2="94" stroke="#A89B82" stroke-width="1"/>
+
+          <text x="120" y="118" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" fill="#0F1F2E">DB_USER</text>
+          <text x="120" y="138" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" fill="#0F1F2E">DB_ADDRESSES</text>
+
+          <line x1="24" y1="150" x2="216" y2="150" stroke="#A89B82" stroke-width="1" stroke-dasharray="2 2"/>
+          <text x="120" y="166" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#367F94" letter-spacing="1">EXPOSES · DB_READ / DB_READ_GRANTOR#</text>
+        </g>
+
+        <!-- Bridge / arrow -->
+        <g transform="translate(275, 130)">
+          <line x1="0" y1="0" x2="165" y2="0" stroke="#0F1F2E" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <line x1="0" y1="-14" x2="165" y2="-14" stroke="#A89B82" stroke-width="1" stroke-dasharray="3 3"/>
+          <text x="82" y="-22" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#556673" letter-spacing="1.5">SERVICE_REPLACEMENTS</text>
+          <text x="82" y="14" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#B04A2C" letter-spacing="1">.hdbgrants · .hdbsynonym</text>
+        </g>
+
+        <!-- Container B (consumer) -->
+        <g transform="translate(450, 40)">
+          <rect x="0" y="0" width="240" height="180" fill="#EDE8DE" stroke="#0F1F2E" stroke-width="1.5"/>
+          <rect x="6" y="6" width="228" height="168" fill="none" stroke="#A89B82" stroke-width="1" stroke-dasharray="3 3"/>
+          <text x="120" y="30" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#B04A2C" letter-spacing="1.5">CONSUMER</text>
+          <text x="120" y="58" text-anchor="middle" font-family="'Space Grotesk', sans-serif" font-size="16" font-weight="600" fill="#0F1F2E">Container B</text>
+          <text x="120" y="76" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#556673">delivery_management_system</text>
+
+          <line x1="24" y1="94" x2="216" y2="94" stroke="#A89B82" stroke-width="1"/>
+
+          <text x="120" y="112" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#367F94" letter-spacing="0.5">SYNONYM →</text>
+          <text x="120" y="128" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#0F1F2E">DELIVERYASSIGNMENT_</text>
+          <text x="120" y="140" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#0F1F2E">EXTERNALUSERS</text>
+
+          <line x1="24" y1="152" x2="216" y2="152" stroke="#A89B82" stroke-width="1" stroke-dasharray="2 2"/>
+          <text x="120" y="166" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#367F94" letter-spacing="1">CAP · OData /admin/Users</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<div class="grid-main">
+  <aside class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><span>01</span><a href="#overview">The shape of the problem</a></li>
+      <li><span>02</span><a href="#three-files">The three files</a></li>
+      <li><span>03</span><a href="#roles">Container A · Roles</a></li>
+      <li><span>04</span><a href="#binding">Container B · Binding</a></li>
+      <li><span>05</span><a href="#hdiconfig">Container B · .hdiconfig</a></li>
+      <li><span>06</span><a href="#grants">Container B · .hdbgrants</a></li>
+      <li><span>07</span><a href="#synonym">Container B · .hdbsynonym</a></li>
+      <li><span>08</span><a href="#synonymconfig">Container B · .hdbsynonymconfig</a></li>
+      <li><span>09</span><a href="#facade">CDS facade + service</a></li>
+      <li><span>10</span><a href="#mta">mta.yaml</a></li>
+      <li><span>11</span><a href="#deploy">Deploy &amp; verify</a></li>
+      <li><span>12</span><a href="#errors">Errors we hit</a></li>
+      <li><span>13</span><a href="#glossary">Name glossary</a></li>
+    </ol>
+  </aside>
+
+  <main>
+    <article>
+
+<!-- ================ 01 OVERVIEW ================ -->
+<section class="chapter" id="overview">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 01 · The Shape of the Problem</div>
+    <h2 class="chapter-title">Two containers, one wire.</h2>
+    <p class="chapter-lead">HDI containers on HANA Cloud are schema-isolated by design. You can't just <code class="inline-code">SELECT * FROM other_schema.table</code> from your app. Cross-container access is the sanctioned way to punch a hole through — one narrow, permissioned wire between exactly two containers.</p>
+  </div>
+
+  <p>In this guide, <strong>Container A</strong> (<code class="inline-code">mid_night_crave-db</code>) owns two tables: <code class="inline-code">DB_USER</code> and <code class="inline-code">DB_ADDRESSES</code>. <strong>Container B</strong> (<code class="inline-code">delivery_management_system-db</code>) is our CAP app that needs to read from them. Neither container gets modified structurally — instead, Container A publishes a couple of <em>roles</em>, and Container B claims them.</p>
+
+  <div class="container-pair">
+    <div class="container-box">
+      <div class="container-code">Container A · Provider</div>
+      <div class="container-name">mid_night_crave-db</div>
+      <div class="container-role">Owns the data</div>
+      <div class="container-content">
+        <ul>
+          <li>DB_USER</li>
+          <li>DB_ADDRESSES</li>
+          <li>DB_READ (role)</li>
+          <li>DB_READ_GRANTOR# (role)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="bridge-arrow">
+      <svg viewBox="0 0 40 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="0" y1="10" x2="34" y2="10" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M28 4 L36 10 L28 16" stroke="currentColor" stroke-width="1.5" fill="none"/>
+      </svg>
+      <span>via binding</span>
+    </div>
+    <div class="container-box">
+      <div class="container-code">Container B · Consumer</div>
+      <div class="container-name">delivery_management_system</div>
+      <div class="container-role">Reads the data</div>
+      <div class="container-content">
+        <ul>
+          <li>Synonyms → A's tables</li>
+          <li>CAP facade entities</li>
+          <li>OData services</li>
+          <li>Fiori UI apps</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">Mental model</div>
+    <p>Container A is a records room in another building. Container B is your office. The <strong>role</strong> is your key card, the <strong>synonym</strong> is a labeled file drawer in your office, the <strong>synonymconfig</strong> is the note inside saying <em>"see file X in Room 203"</em>. You need all three, or nothing works.</p>
+  </div>
+</section>
+
+<!-- ================ 02 THREE FILES ================ -->
+<section class="chapter" id="three-files">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 02 · The Three Files</div>
+    <h2 class="chapter-title">Everything hinges on three JSON files.</h2>
+    <p class="chapter-lead">Every cross-container setup, no matter how large, comes down to writing these three files in Container B's <code class="inline-code">db/</code> folder. Each answers exactly one question.</p>
+  </div>
+
+  <div class="manifest-card">
+    <div class="manifest-header">
+      <div>
+        <div class="manifest-title">.hdbgrants — <em>am I allowed to see it?</em></div>
+      </div>
+      <span class="manifest-tag grant">Grant</span>
+    </div>
+    <div class="manifest-body">
+      Tells HDI to log into Container A and grant Container B's users the roles Container A exposed. Runs first, before any object is created. Without this, the synonym works but every query returns "insufficient privilege."
+    </div>
+    <div class="manifest-meta">
+      <div class="meta-item"><div class="meta-item-label">Location</div><div class="meta-item-val">db/cfg/</div></div>
+      <div class="meta-item"><div class="meta-item-label">Plugin</div><div class="meta-item-val">di.grants</div></div>
+      <div class="meta-item"><div class="meta-item-label">When</div><div class="meta-item-val">Before deploy</div></div>
+    </div>
+  </div>
+
+  <div class="manifest-card">
+    <div class="manifest-header">
+      <div>
+        <div class="manifest-title">.hdbsynonym — <em>what do I call it locally?</em></div>
+      </div>
+      <span class="manifest-tag synonym">Synonym</span>
+    </div>
+    <div class="manifest-body">
+      Creates a synonym object in Container B's catalog. Empty by itself — just a declaration that "an object with this local name will exist here." Without this, there's no handle in Container B to reference the remote table.
+    </div>
+    <div class="manifest-meta">
+      <div class="meta-item"><div class="meta-item-label">Location</div><div class="meta-item-val">db/src/</div></div>
+      <div class="meta-item"><div class="meta-item-label">Plugin</div><div class="meta-item-val">di.synonym</div></div>
+      <div class="meta-item"><div class="meta-item-label">When</div><div class="meta-item-val">Make phase</div></div>
+    </div>
+  </div>
+
+  <div class="manifest-card">
+    <div class="manifest-header">
+      <div>
+        <div class="manifest-title">.hdbsynonymconfig — <em>where does the name point to?</em></div>
+      </div>
+      <span class="manifest-tag config">Config</span>
+    </div>
+    <div class="manifest-body">
+      Wires the synonym to a real remote object. Contains <code class="inline-code">target.object</code> (real table name in Container A) and <code class="inline-code">schema.configure</code> (which service binding to read the schema from). This split lets you swap the target without rebuilding the synonym.
+    </div>
+    <div class="manifest-meta">
+      <div class="meta-item"><div class="meta-item-label">Location</div><div class="meta-item-val">db/cfg/</div></div>
+      <div class="meta-item"><div class="meta-item-label">Plugin</div><div class="meta-item-val">di.synonym.config</div></div>
+      <div class="meta-item"><div class="meta-item-label">When</div><div class="meta-item-val">Runtime bound</div></div>
+    </div>
+  </div>
+
+  <div class="callout ok">
+    <div class="callout-label">Key rule</div>
+    <p>The outer JSON key in <code class="inline-code">.hdbsynonym</code> and <code class="inline-code">.hdbsynonymconfig</code> <strong>must match exactly</strong>. That's how HDI stitches the two files together into one working synonym.</p>
+  </div>
+</section>
+
+<!-- ================ 03 CONTAINER A ROLES ================ -->
+<section class="chapter" id="roles">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 03 · Container A · Roles</div>
+    <h2 class="chapter-title">Publish two roles from the provider.</h2>
+    <p class="chapter-lead">Container A defines what "read access" looks like, then hands the keys to Container B in the form of named roles. Two roles because there are two audiences with different needs.</p>
+  </div>
+
+  <p>The <strong>grantor</strong> role goes to Container B's object owner (the internal <code class="inline-code">#OO</code> user) — needs <code class="inline-code">with_grant_option</code> so it can re-share the privilege down to synonyms. The <strong>runtime</strong> role goes to Container B's application user (<code class="inline-code">_RT</code>), which is what the CAP app actually uses to query data.</p>
+
+  <div class="codeblock">
+    <div class="codeblock-header">
+      <div class="codeblock-filename">
+        <span class="filename-dot role"></span>
+        <span>mid_night_crave/db/src/DB_READ_GRANTOR.hdbrole</span>
+      </div>
+      <button class="copy-btn">Copy</button>
+    </div>
+<pre class="code">{
+  <span class="k">"role"</span><span class="p">:</span> {
+    <span class="k">"name"</span><span class="p">:</span> <span class="s">"DB_READ_GRANTOR#"</span><span class="p">,</span>
+    <span class="k">"object_privileges"</span><span class="p">:</span> [
+      {
+        <span class="k">"name"</span><span class="p">:</span> <span class="s">"DB_USER"</span><span class="p">,</span>
+        <span class="k">"type"</span><span class="p">:</span> <span class="s">"TABLE"</span><span class="p">,</span>
+        <span class="k">"privileges_with_grant_option"</span><span class="p">:</span> [<span class="s">"SELECT"</span>]
+      }<span class="p">,</span>
+      {
+        <span class="k">"name"</span><span class="p">:</span> <span class="s">"DB_ADDRESSES"</span><span class="p">,</span>
+        <span class="k">"type"</span><span class="p">:</span> <span class="s">"TABLE"</span><span class="p">,</span>
+        <span class="k">"privileges_with_grant_option"</span><span class="p">:</span> [<span class="s">"SELECT"</span>]
+      }
+    ]
+  }
+}</pre>
+  </div>
+
+  <div class="codeblock">
+    <div class="codeblock-header">
+      <div class="codeblock-filename">
+        <span class="filename-dot role"></span>
+        <span>mid_night_crave/db/src/DB_READ.hdbrole</span>
+      </div>
+      <button class="copy-btn">Copy</button>
+    </div>
+<pre class="code">{
+  <span class="k">"role"</span><span class="p">:</span> {
+    <span class="k">"name"</span><span class="p">:</span> <span class="s">"DB_READ"</span><span class="p">,</span>
+    <span class="k">"object_privileges"</span><span class="p">:</span> [
+      {
+        <span class="k">"name"</span><span class="p">:</span> <span class="s">"DB_USER"</span><span class="p">,</span>
+        <span class="k">"type"</span><span class="p">:</span> <span class="s">"TABLE"</span><span class="p">,</span>
+        <span class="k">"privileges"</span><span class="p">:</span> [<span class="s">"SELECT"</span>]
+      }<span class="p">,</span>
+      {
+        <span class="k">"name"</span><span class="p">:</span> <span class="s">"DB_ADDRESSES"</span><span class="p">,</span>
+        <span class="k">"type"</span><span class="p">:</span> <span class="s">"TABLE"</span><span class="p">,</span>
+        <span class="k">"privileges"</span><span class="p">:</span> [<span class="s">"SELECT"</span>]
+      }
+    ]
+  }
+}</pre>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">Naming convention</div>
+    <p>The <code class="inline-code">#</code> suffix on <code class="inline-code">DB_READ_GRANTOR#</code> is SAP convention — it marks a role that carries <code class="inline-code">with_grant_option</code>, so it's for object owners. Plain names (no suffix) are for runtime users.</p>
+  </div>
+
+  <p>After adding these files, deploy Container A first (<code class="inline-code">cds deploy --to hana</code> or <code class="inline-code">cds up</code>). The roles must exist in HANA <em>before</em> Container B tries to grant them to itself.</p>
+</section>
+
+<!-- ================ 04 BINDING ================ -->
+<section class="chapter" id="binding">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 04 · Container B · Binding</div>
+    <h2 class="chapter-title">Give Container B a phone number for Container A.</h2>
+    <p class="chapter-lead">Container B's project needs to know Container A's HDI service exists. The easiest way is through Business Application Studio's SAP HANA Projects view, which auto-updates <code class="inline-code">mta.yaml</code>.</p>
+  </div>
+
+  <h3>Via SAP HANA Projects (BAS)</h3>
+  <ol class="numbered">
+    <li>Open Container B's project in BAS.</li>
+    <li>Left activity bar → click the <strong>SAP HANA</strong> icon.</li>
+    <li>Expand your project → <strong>Database Connections</strong>.</li>
+    <li>Click <strong>+</strong> → <strong>Add HDI service instance</strong>.</li>
+    <li>Pick <code class="inline-code">mid_night_crave-db</code> from the list.</li>
+    <li>Accept the default binding name (<code class="inline-code">cross-container-service-1</code>) or type your own.</li>
+  </ol>
+
+  <p>BAS writes two blocks to <code class="inline-code">mta.yaml</code> automatically. You don't touch them by hand.</p>
+
+  <div class="codeblock">
+    <div class="codeblock-header">
+      <div class="codeblock-filename">
+        <span class="filename-dot yaml"></span>
+        <span>mta.yaml (auto-added blocks)</span>
+      </div>
+      <button class="copy-btn">Copy</button>
+    </div>
+<pre class="code"><span class="c"># In modules → db-deployer → requires:</span>
+- <span class="k">name</span>: cross-container-service-1
+  <span class="k">group</span>: SERVICE_REPLACEMENTS
+  <span class="k">properties</span>:
+    <span class="k">key</span>: ServiceName_1
+    <span class="k">service</span>: ~{the-service-name}
+
+<span class="c"># In resources:</span>
+- <span class="k">name</span>: cross-container-service-1
+  <span class="k">type</span>: org.cloudfoundry.existing-service
+  <span class="k">parameters</span>:
+    <span class="k">service-name</span>: mid_night_crave-db
+  <span class="k">properties</span>:
+    <span class="k">the-service-name</span>: ${service-name}</pre>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">Three names, one wire</div>
+    <p>You'll see three different names for the same connection — that trips people up. <code class="inline-code">mid_night_crave-db</code> is the real CF service. <code class="inline-code">cross-container-service-1</code> is BAS's internal label. <code class="inline-code">ServiceName_1</code> is the logical alias HDI uses. All three point to the same thing. See <a href="#glossary" class="inline">Chapter 13</a> for when to use which.</p>
+  </div>
+</section>
+
+<!-- ================ 05 HDICONFIG ================ -->
+<section class="chapter" id="hdiconfig">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 05 · Container B · .hdiconfig</div>
+    <h2 class="chapter-title">Register the plugins HDI will need.</h2>
+    <p class="chapter-lead">HDI needs to be told which plugin handles which file type. For cross-container, that means adding <code class="inline-code">hdbrole</code>, <code class="inline-code">hdbsynonym</code>, and <code class="inline-code">hdbsynonymconfig</code> to the plugin map.</p>
+  </div>
+
+  <div class="codeblock">
+    <div class="codeblock-header">
+      <div class="codeblock-filename">
+        <span class="filename-dot"></span>
+        <span>delivery_management_system/db/src/.hdiconfig</span>
+      </div>
+      <button class="copy-btn">Copy</button>
+    </div>
+<pre class="code">{
+  <span class="k">"file_suffixes"</span><span class="p">:</span> {
+    <span class="k">"csv"</span><span class="p">:</span>              { <span class="k">"plugin_name"</span><span class="p">:</span> <span class="s">"com.sap.hana.di.tabledata.source"</span> }<span class="p">,</span>
+    <span class="k">"hdbcalculationview"</span><span class="p">:</span> { <span class="k">"plugin_name"</span><span class="p">:</span> <span class="s">"com.sap.hana.di.calculationview"</span> }<span class="p">,</span>
+    <span class="k">"hdbconstraint"</span><span class="p">:</span>    { <span class="k">"plugin_name"</span><span class="p">:</span> <span class="s">"com.sap.hana.di.constraint"</span> }<span class="p">,</span>
+    <span class="k">"hdbindex"</span><span class="p">:</span>        { <span class="k">"plugin_name"</span><span class="p">:</span> <span class="s">"com.sap.hana.di.index"</span> }<span class="p">,</span>
+    <span class="k">"hdbrole"</span><span class="p">:</span>         { <span class="k">"plugin_name"</span><span class="p">:</span> <span class="s">"com.sap.hana.di.role"</span> }<span class="p">,</span>
+    <span class="k">"hdbsynonym"</span><span class="p">:</span>      { <span class="k">"plugin_name"</span><span class="p">:</span> <span class="s">"com.sap.hana.di.synonym"</span> }<span class="p">,</span>
+    <span class="k">"hdbsynonymconfig"</span><span class="p">:</span>{ <span class="k">"plugin_name"</span><span class="p">:</span> <span class="s">"com.sap.hana.di.synonym.config"</span> }<span class="p">,</span>
+    <span class="k">"hdbtable"</span><span class="p">:</span>        { <span class="k">"plugin_name"</span><span class="p">:</span> <span class="s">"com.sap.hana.di.table"</span> }<span class="p">,</span>
+    <span class="k">"hdbtabledata"</span><span class="p">:</span>    { <span class="k">"plugin_name"</span><span class="p">:</span> <span class="s">"com.sap.hana.di.tabledata"</span> }<span class="p">,</span>
+    <span class="k">"hdbview"</span><span class="p">:</span>         { <span class="k">"plugin_name"</span><span class="p">:</span> <span class="s">"com.sap.hana.di.view"</span> }
+  }
+}</pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-label">Sibling folder trap</div>
+    <p>Your hand-written files live in <code class="inline-code">db/src/</code>. CAP-generated files live in <code class="inline-code">db/src/gen/</code>. HDI looks for <code class="inline-code">.hdiconfig</code> in the same folder or a parent — never sideways. So the <code class="inline-code">.hdiconfig</code> CAP generates at <code class="inline-code">db/src/gen/.hdiconfig</code> does <strong>not</strong> cover files at <code class="inline-code">db/src/</code>. You must provide your own at <code class="inline-code">db/src/.hdiconfig</code>.</p>
+  </div>
+</section>
+
+<!-- ================ 06 GRANTS ================ -->
+<section class="chapter" id="grants">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 06 · Container B · .hdbgrants</div>
+    <h2 class="chapter-title">Claim the roles Container A published.</h2>
+    <p class="chapter-lead">This file tells HDI: <em>reach into the service binding, log in as Container A's grantor, and give my users the two roles</em>.</p>
+  </div>
+
+  <div class="codeblock">
+    <div class="codeblock-header">
+      <div class="codeblock-filename">
+        <span class="filename-dot grant"></span>
+        <span>delivery_management_system/db/cfg/midnightgrant.hdbgrants</span>
+      </div>
+      <button class="copy-btn">Copy</button>
+    </div>
+<pre class="code">{
+  <span class="k">"mid_night_crave-db"</span><span class="p">:</span> {
+    <span class="k">"object_owner"</span><span class="p">:</span> {
+      <span class="k">"container_roles"</span><span class="p">:</span> [<span class="s">"DB_READ_GRANTOR#"</span>]
+    }<span class="p">,</span>
+    <span class="k">"application_user"</span><span class="p">:</span> {
+      <span class="k">"container_roles"</span><span class="p">:</span> [<span class="s">"DB_READ"</span>]
+    }
+  }
+}</pre>
+  </div>
+
+  <h4>Reading it line by line</h4>
+  <ul>
+    <li><strong><code class="inline-code">mid_night_crave-db</code></strong> — the service the grants come from. Must match the CF service name (or the SERVICE_REPLACEMENTS logical name; both work).</li>
+    <li><strong><code class="inline-code">object_owner</code></strong> — Container B's <code class="inline-code">#OO</code> user gets <code class="inline-code">DB_READ_GRANTOR#</code>, because it needs to re-grant SELECT down to the synonym it creates.</li>
+    <li><strong><code class="inline-code">application_user</code></strong> — Container B's <code class="inline-code">_RT</code> user gets plain <code class="inline-code">DB_READ</code>, no grant option — this is what your CAP app uses at runtime.</li>
+    <li><strong><code class="inline-code">container_roles</code></strong> — not <code class="inline-code">schema_roles</code>. This category is specific to HDI-to-HDI access. Using the wrong category is a common source of "not found" errors.</li>
+  </ul>
+
+  <div class="callout err">
+    <div class="callout-label">Common mistake</div>
+    <p>BAS's graphical <code class="inline-code">.hdbgrants</code> editor shows sections for <em>Schema Roles</em>, <em>System Privileges</em>, etc. — but no <em>Container Roles</em> section. People click "Schema Roles" thinking roles are roles. They're not. Switch to code view and use <code class="inline-code">container_roles</code>.</p>
+  </div>
+</section>
+
+<!-- ================ 07 SYNONYM ================ -->
+<section class="chapter" id="synonym">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 07 · Container B · .hdbsynonym</div>
+    <h2 class="chapter-title">Declare the local names.</h2>
+    <p class="chapter-lead">In HANA Cloud, <code class="inline-code">.hdbsynonym</code> is just a declaration — empty objects. The actual target lives in the config file. Multiple synonyms can live in one file.</p>
+  </div>
+
+  <div class="codeblock">
+    <div class="codeblock-header">
+      <div class="codeblock-filename">
+        <span class="filename-dot synonym"></span>
+        <span>delivery_management_system/db/src/cross_syn.hdbsynonym</span>
+      </div>
+      <button class="copy-btn">Copy</button>
+    </div>
+<pre class="code">{
+  <span class="k">"DELIVERYASSIGNMENT_EXTERNALUSERS"</span><span class="p">:</span> {}<span class="p">,</span>
+  <span class="k">"DELIVERYASSIGNMENT_ADDRESSES"</span><span class="p">:</span> {}
+}</pre>
+  </div>
+
+  <h4>Why these specific names?</h4>
+  <p>The outer key must match the DB name CAP will look for when it queries your facade entity. For an entity named <code class="inline-code">ExternalUsers</code> in namespace <code class="inline-code">DeliveryAssignment</code>, CAP derives the DB name as <code class="inline-code">DeliveryAssignment_ExternalUsers</code>. HANA folds unquoted identifiers to uppercase → <code class="inline-code">DELIVERYASSIGNMENT_EXTERNALUSERS</code>. That's what your synonym must be named.</p>
+
+  <div class="callout warn">
+    <div class="callout-label">The 8212001 lesson</div>
+    <p>If the synonym name doesn't match CAP's derived name, you get <code class="inline-code">db://DELIVERYASSIGNMENT_EXTERNALUSERS is not provided by any file [8212001]</code>. The synonym IS the provider — but if it's named <code class="inline-code">DB_USER</code> instead, CAP's generated projection can't find it. Match the names.</p>
+  </div>
+</section>
+
+<!-- ================ 08 SYNONYMCONFIG ================ -->
+<section class="chapter" id="synonymconfig">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 08 · Container B · .hdbsynonymconfig</div>
+    <h2 class="chapter-title">Point each synonym at the real remote object.</h2>
+    <p class="chapter-lead">Same outer keys as the synonym file, but now with targets. This is where local names get translated to real Container A objects.</p>
+  </div>
+
+  <div class="codeblock">
+    <div class="codeblock-header">
+      <div class="codeblock-filename">
+        <span class="filename-dot config"></span>
+        <span>delivery_management_system/db/cfg/cross_syn.hdbsynonymconfig</span>
+      </div>
+      <button class="copy-btn">Copy</button>
+    </div>
+<pre class="code">{
+  <span class="k">"DELIVERYASSIGNMENT_EXTERNALUSERS"</span><span class="p">:</span> {
+    <span class="k">"target"</span><span class="p">:</span> {
+      <span class="k">"object"</span><span class="p">:</span> <span class="s">"DB_USER"</span><span class="p">,</span>
+      <span class="k">"schema.configure"</span><span class="p">:</span> <span class="s">"mid_night_crave-db/schema"</span>
+    }
+  }<span class="p">,</span>
+  <span class="k">"DELIVERYASSIGNMENT_ADDRESSES"</span><span class="p">:</span> {
+    <span class="k">"target"</span><span class="p">:</span> {
+      <span class="k">"object"</span><span class="p">:</span> <span class="s">"DB_ADDRESSES"</span><span class="p">,</span>
+      <span class="k">"schema.configure"</span><span class="p">:</span> <span class="s">"mid_night_crave-db/schema"</span>
+    }
+  }
+}</pre>
+  </div>
+
+  <h4>Reading the target</h4>
+  <ul>
+    <li><strong><code class="inline-code">object</code></strong> — the real table name inside Container A. This is what actually gets queried.</li>
+    <li><strong><code class="inline-code">schema.configure</code></strong> — instead of hardcoding Container A's schema GUID (<code class="inline-code">C8C9CBABB6F94EDBB7252E163401B8A7</code>), tell HDI to look it up from the service binding at runtime. Format: <code class="inline-code">&lt;service-name&gt;/schema</code>.</li>
+  </ul>
+
+  <p>Never hardcode the schema GUID. If Container A is redeployed (new HDI instance), the GUID changes. <code class="inline-code">schema.configure</code> reads it dynamically each deploy.</p>
+</section>
+
+<!-- ================ 09 FACADE ================ -->
+<section class="chapter" id="facade">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 09 · CDS Facade + Service</div>
+    <h2 class="chapter-title">Expose the remote table as a CAP entity.</h2>
+    <p class="chapter-lead">Now that the synonym exists in Container B's schema, CAP can treat it like any other table. Declare a facade entity, tell CAP it already exists in the DB, expose it in a service.</p>
+  </div>
+
+  <div class="codeblock">
+    <div class="codeblock-header">
+      <div class="codeblock-filename">
+        <span class="filename-dot cds"></span>
+        <span>db/model.cds</span>
+      </div>
+      <button class="copy-btn">Copy</button>
+    </div>
+<pre class="code"><span class="k">namespace</span> DeliveryAssignment<span class="p">;</span>
+
+<span class="c">// existing entities: WareHouse, Driver, Shipment, ...</span>
+
+<span class="k">@cds.persistence.exists</span>
+<span class="k">entity</span> ExternalUsers {
+  <span class="k">key</span> ID    <span class="p">:</span> String(36)<span class="p">;</span>
+      NAME  <span class="p">:</span> String(100)<span class="p">;</span>
+      EMAIL <span class="p">:</span> String(100)<span class="p">;</span>
+}
+
+<span class="k">@cds.persistence.exists</span>
+<span class="k">entity</span> Addresses {
+  <span class="k">key</span> ID     <span class="p">:</span> String(36)<span class="p">;</span>
+      STREET <span class="p">:</span> String(200)<span class="p">;</span>
+      CITY   <span class="p">:</span> String(100)<span class="p">;</span>
+}</pre>
+  </div>
+
+  <div class="codeblock">
+    <div class="codeblock-header">
+      <div class="codeblock-filename">
+        <span class="filename-dot cds"></span>
+        <span>srv/admin-service.cds</span>
+      </div>
+      <button class="copy-btn">Copy</button>
+    </div>
+<pre class="code"><span class="k">using</span> {DeliveryAssignment <span class="k">as</span> DA} <span class="k">from</span> <span class="s">'../db/model'</span><span class="p">;</span>
+
+<span class="k">service</span> adminService {
+  <span class="c">// ... other entities</span>
+
+  <span class="k">@readonly</span>
+  <span class="k">entity</span> Users     <span class="k">as</span> <span class="k">projection</span> <span class="k">on</span> DA.ExternalUsers<span class="p">;</span>
+
+  <span class="k">@readonly</span>
+  <span class="k">entity</span> Addresses <span class="k">as</span> <span class="k">projection</span> <span class="k">on</span> DA.Addresses<span class="p">;</span>
+}</pre>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">The @cds.persistence.exists contract</div>
+    <p>This annotation tells the CDS compiler <em>"don't generate a .hdbtable for this entity — it already exists"</em>. The entity's derived DB name (namespace + entity name, joined by underscore) must match the object it references. In our case, <code class="inline-code">DeliveryAssignment.ExternalUsers</code> → <code class="inline-code">DELIVERYASSIGNMENT_EXTERNALUSERS</code> → matches the synonym.</p>
+  </div>
+
+  <p>Element names (ID, NAME, EMAIL) must match the real column names in Container A's <code class="inline-code">DB_USER</code>, in the same case HANA stores them (usually uppercase for unquoted CDS-generated columns).</p>
+</section>
+
+<!-- ================ 10 MTA ================ -->
+<section class="chapter" id="mta">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 10 · mta.yaml</div>
+    <h2 class="chapter-title">The full deployment descriptor.</h2>
+    <p class="chapter-lead">This is the deployed <code class="inline-code">mta.yaml</code> that ties every service together. The cross-container blocks are highlighted below; the rest is standard CAP scaffolding.</p>
+  </div>
+
+  <div class="codeblock">
+    <div class="codeblock-header">
+      <div class="codeblock-filename">
+        <span class="filename-dot yaml"></span>
+        <span>mta.yaml (cross-container blocks)</span>
+      </div>
+      <button class="copy-btn">Copy</button>
+    </div>
+<pre class="code"><span class="c"># Under modules → delivery_management_system-db-deployer:</span>
+- <span class="k">name</span>: delivery_management_system-db-deployer
+  <span class="k">type</span>: hdb
+  <span class="k">path</span>: gen/db
+  <span class="k">requires</span>:
+  - <span class="k">name</span>: delivery_management_system-db
+    <span class="k">properties</span>:
+      <span class="k">TARGET_CONTAINER</span>: ~{hdi-container-name}
+  - <span class="k">name</span>: cross-container-service-1     <span class="c"># ← the wire</span>
+    <span class="k">group</span>: SERVICE_REPLACEMENTS
+    <span class="k">properties</span>:
+      <span class="k">key</span>: ServiceName_1
+      <span class="k">service</span>: ~{the-service-name}
+
+<span class="c"># Under resources:</span>
+- <span class="k">name</span>: cross-container-service-1
+  <span class="k">type</span>: org.cloudfoundry.existing-service
+  <span class="k">parameters</span>:
+    <span class="k">service-name</span>: mid_night_crave-db     <span class="c"># ← Container A</span>
+  <span class="k">properties</span>:
+    <span class="k">the-service-name</span>: ${service-name}</pre>
+  </div>
+
+  <p>The <code class="inline-code">SERVICE_REPLACEMENTS</code> group is what tells the HDI deployer at runtime: <em>"when a file references <code class="inline-code">ServiceName_1</code>, use the <code class="inline-code">mid_night_crave-db</code> service binding for it."</em></p>
+</section>
+
+<!-- ================ 11 DEPLOY ================ -->
+<section class="chapter" id="deploy">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 11 · Deploy &amp; Verify</div>
+    <h2 class="chapter-title">Wire it up.</h2>
+    <p class="chapter-lead">Cross-container needs MTA deployment. <code class="inline-code">cds deploy --to hana</code> alone won't work — it doesn't read <code class="inline-code">mta.yaml</code>, so SERVICE_REPLACEMENTS never resolves.</p>
+  </div>
+
+  <h3>Deploy order</h3>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num"></div>
+      <div class="flow-body">
+        <strong>Deploy Container A first</strong>
+        <span>So the two roles (<code class="inline-code">DB_READ</code>, <code class="inline-code">DB_READ_GRANTOR#</code>) actually exist in HANA. Container B can't be granted roles that don't exist yet.</span>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num"></div>
+      <div class="flow-body">
+        <strong>Bind Container A to Container B</strong>
+        <span>Done once via BAS (Chapter 04). BAS updates <code class="inline-code">mta.yaml</code>. You don't repeat this unless you change providers.</span>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num"></div>
+      <div class="flow-body">
+        <strong>Build &amp; deploy Container B via MTA</strong>
+        <span>Run <code class="inline-code">cds up</code> — this wraps <code class="inline-code">mbt build</code> + <code class="inline-code">cf deploy</code>. HDI processes grants first, then synonym + config, then any views that use them.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="codeblock">
+    <div class="codeblock-header">
+      <div class="codeblock-filename">
+        <span class="filename-dot yaml"></span>
+        <span>terminal · deploy commands</span>
+      </div>
+      <button class="copy-btn">Copy</button>
+    </div>
+<pre class="code"><span class="c"># One-time setup</span>
+<span class="cmd">npm i -g mbt</span>
+<span class="cmd">cf install-plugin -f multiapps</span>
+<span class="cmd">cf login</span>
+
+<span class="c"># Container A</span>
+<span class="cmd">cd mid_night_crave</span>
+<span class="cmd">cds up</span>
+
+<span class="c"># Container B</span>
+<span class="cmd">cd ../delivery_management_system</span>
+<span class="cmd">cds up</span>
+
+<span class="c"># Or manually:</span>
+<span class="cmd">cds build --production</span>
+<span class="cmd">mbt build</span>
+<span class="cmd">cf deploy mta_archives/delivery_management_system_1.0.0.mtar</span></pre>
+  </div>
+
+  <h3>Verify in HANA Database Explorer</h3>
+  <ol class="numbered">
+    <li>Open Container B in DB Explorer (BTP Cockpit → HDI container → Open in DB Explorer).</li>
+    <li>Catalog → <strong>Synonyms</strong> → look for <code class="inline-code">DELIVERYASSIGNMENT_EXTERNALUSERS</code>.</li>
+    <li>Right-click → Generate SELECT statement → Run. Rows from Container A's <code class="inline-code">DB_USER</code> should appear.</li>
+    <li>Hit the OData endpoint: <code class="inline-code">/odata/v4/admin-service/Users</code> — should return the same data through CAP.</li>
+  </ol>
+
+  <div class="callout ok">
+    <div class="callout-label">Verified</div>
+    <p>All the files in this guide were deployed successfully to BTP Trial. The chain <em>synonym → grant → CAP projection</em> works end-to-end. Runtime user queries flow through the synonym into Container A without either app touching the other's schema directly.</p>
+  </div>
+</section>
+
+<!-- ================ 12 ERRORS ================ -->
+<section class="chapter" id="errors">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 12 · Errors We Hit</div>
+    <h2 class="chapter-title">Every failure code, translated.</h2>
+    <p class="chapter-lead">The exact errors seen during this setup, what they meant, and how they were fixed. If you see one of these next time, you have a shortcut.</p>
+  </div>
+
+  <table class="errtable">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Message &amp; meaning</th>
+        <th>Fix</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="code">8212808</td>
+        <td>
+          <strong>Could not find a <code class="inline-code">.hdiconfig</code> file in <code class="inline-code">src</code> or any parent folder.</strong><br>
+          HDI has no plugin mapping for your file type.
+        </td>
+        <td>Add <code class="inline-code">db/src/.hdiconfig</code> next to your hand-written files. The one CAP generates in <code class="inline-code">db/src/gen/</code> doesn't reach sideways.</td>
+      </tr>
+      <tr>
+        <td class="code">8211714</td>
+        <td>
+          <strong>Could not create a compile unit for the file.</strong><br>
+          Usually cascades from 8212808 — no plugin found, so nothing to compile.
+        </td>
+        <td>Fix the underlying config problem. If <code class="inline-code">.hdiconfig</code> is present, check that the file's suffix is registered in it.</td>
+      </tr>
+      <tr>
+        <td class="code">8212001</td>
+        <td>
+          <strong>The file requires "db://X" which is not provided by any file.</strong><br>
+          Some <code class="inline-code">.hdbview</code> references a name (like <code class="inline-code">DELIVERYASSIGNMENT_EXTERNALUSERS</code>) but nothing in the container provides that name.
+        </td>
+        <td>Match your synonym's name (the outer JSON key) to whatever CAP or the referring view is looking for. Check <code class="inline-code">gen/db/src/gen/</code> to see the exact name.</td>
+      </tr>
+      <tr>
+        <td class="code">8212012</td>
+        <td>
+          <strong>Could not compose a consistent make graph.</strong><br>
+          Umbrella error. Always shows up together with a 8212001 or 8212002.
+        </td>
+        <td>Fix the underlying error; this one disappears on its own.</td>
+      </tr>
+      <tr>
+        <td class="code">8212002</td>
+        <td>
+          <strong>The object cannot be provided more than once.</strong><br>
+          Two files claim to create the same DB object.
+        </td>
+        <td>Common when renaming synonyms. Delete the old file locally and add it to <code class="inline-code">db/undeploy.json</code> so HDI drops it from the container.</td>
+      </tr>
+      <tr>
+        <td class="code" style="color: var(--ink-2);">service<br>not found</td>
+        <td>
+          <strong>service ServiceName_1 not found; the service definition does not exist.</strong><br>
+          <code class="inline-code">cds deploy --to hana</code> doesn't read <code class="inline-code">mta.yaml</code>, so SERVICE_REPLACEMENTS never resolves.
+        </td>
+        <td>Use <code class="inline-code">cds up</code> (or <code class="inline-code">mbt build</code> + <code class="inline-code">cf deploy</code>) instead. MTA deploy is required for cross-container.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================ 13 GLOSSARY ================ -->
+<section class="chapter" id="glossary">
+  <div class="chapter-head">
+    <div class="chapter-code">Chapter 13 · Name Glossary</div>
+    <h2 class="chapter-title">The three names for the same wire.</h2>
+    <p class="chapter-lead">One of the biggest sources of confusion: BAS produces three different names for what is essentially the same binding. Here's what each is and when to use it.</p>
+  </div>
+
+  <table class="errtable">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>What it is</th>
+        <th>Where it appears</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="code">mid_night_crave-db</td>
+        <td>Container A's real Cloud Foundry service instance name.</td>
+        <td><code class="inline-code">mta.yaml</code> → <code class="inline-code">service-name</code>. Also usable directly in <code class="inline-code">.hdbgrants</code> and <code class="inline-code">.hdbsynonymconfig</code>.</td>
+      </tr>
+      <tr>
+        <td class="code">cross-container-<br>service-1</td>
+        <td>BAS's internal label for the binding. Auto-generated; you can rename.</td>
+        <td><code class="inline-code">mta.yaml</code> → resource name and requires block. Never in <code class="inline-code">.hdb*</code> files.</td>
+      </tr>
+      <tr>
+        <td class="code">ServiceName_1</td>
+        <td>Logical alias for the binding, used by HDI at runtime.</td>
+        <td><code class="inline-code">mta.yaml</code> → <code class="inline-code">SERVICE_REPLACEMENTS.key</code>. Usable in <code class="inline-code">.hdbgrants</code> and <code class="inline-code">.hdbsynonymconfig</code> as an alternative to the real service name.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <div class="callout-label">Which to use in .hdb* files</div>
+    <p>Both the real service name (<code class="inline-code">mid_night_crave-db</code>) and the SERVICE_REPLACEMENTS alias (<code class="inline-code">ServiceName_1</code>) work in <code class="inline-code">.hdbgrants</code> and <code class="inline-code">.hdbsynonymconfig</code>. The alias is more portable (change the provider by editing only <code class="inline-code">mta.yaml</code>). The real name is more direct. Pick one, stay consistent.</p>
+  </div>
+</section>
+
+    </article>
+  </main>
+</div>
+
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <span>Field Guide · Cross-Container Access · Delivery Management System</span>
+    <span>End of manifest</span>
+  </div>
+</footer>
+
+<script>
+  // Copy buttons
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pre = btn.closest('.codeblock').querySelector('pre.code');
+      const text = pre.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.classList.remove('copied');
+        }, 1600);
+      });
+    });
+  });
+
+  // TOC active section highlighting
+  const chapters = document.querySelectorAll('section.chapter');
+  const tocLinks = document.querySelectorAll('aside.toc a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        tocLinks.forEach(a => {
+          a.style.color = a.getAttribute('href') === '#' + id
+            ? 'var(--rust)'
+            : 'var(--ink-2)';
+        });
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  chapters.forEach(c => observer.observe(c));
+</script>
+
+</body>
+</html>
